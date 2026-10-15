@@ -115,8 +115,36 @@
     return o;
   }
 
+  /**
+   * 从"容器节点"（<p>、<td>、<li> 等）自身的 style 里取出可继承的字体属性。
+   * Word/mammoth 习惯把字体放在内层 <span>，但也常有 HTML 把 font-size/font-weight
+   * 直接写在 <p> 上（手写网页、其它转换器）。不继承就会整段丢失字号与加粗。
+   * 内层元素的同名样式优先级更高，会覆盖这里的值。
+   */
+  function fontCtxOf(node, ctx) {
+    const st = parseStyleAttr(node && node.attrs && node.attrs.style);
+    if (!st || !Object.keys(st).length) return ctx;
+    const fw = String(st['font-weight'] || '').toLowerCase();
+    const fs = String(st['font-style'] || '').toLowerCase();
+    const deco = String(st['text-decoration'] || '') + ' ' + String(st['text-decoration-line'] || '');
+    const vAlign = String(st['vertical-align'] || '').toLowerCase();
+    const base = Object.assign({}, ctx);
+    if (fw === 'bold' || (/^\d{3,4}$/.test(fw) && parseInt(fw, 10) >= 600)) base.b = true;
+    if (fs === 'italic' || fs === 'oblique') base.i = true;
+    if (deco.includes('underline')) base.u = true;
+    if (deco.includes('line-through')) base.strike = true;
+    if (vAlign === 'super' || vAlign === 'text-top') base.sup = true;
+    if (vAlign === 'sub') base.sub = true;
+    base.size = parseSize(st['font-size']) || ctx.size;
+    base.color = normalizeColor(st.color) || ctx.color;
+    const fam = (st['font-family'] || '').replace(/["']/g, '').split(',')[0].trim();
+    base.font = fam || ctx.font;
+    return base;
+  }
+
   /** 把一个行内节点树展开成 runs */
   function collectRuns(node, ctx, runs) {
+    ctx = fontCtxOf(node, ctx);
     for (const child of node.children || []) {
       if (child.tag === '#text') {
         const t = ctx.pre ? child.text : core.normSpace(child.text);
