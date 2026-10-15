@@ -98,14 +98,7 @@ const BAIDU_LANG = {
     'sl': 'slo', 'tr': 'tr', 'uk': 'ukr', 'fa': 'per'
 };
 
-/** 百度免费版限 QPS=1，用时间戳把请求串起来，保证两次调用间隔 >= BAIDU_QPS_MS */
-let baiduLastCall = 0;
-async function baiduThrottle() {
-    const gap = parseInt(process.env.BAIDU_QPS_MS || '1100', 10);
-    const wait = baiduLastCall + gap - Date.now();
-    if (wait > 0) await new Promise(r => setTimeout(r, wait));
-    baiduLastCall = Date.now();
-}
+/** 百度免费版限 QPS=1，节流统一由 route() 里的 throttle() 负责，这里不再重复等待 */
 
 async function callBaidu(text, target) {
     const appid = process.env.BAIDU_APP_ID;
@@ -116,8 +109,6 @@ async function callBaidu(text, target) {
     const q = text.substring(0, 1900);          // 百度单次上限约 2000 字节
     const salt = String(Date.now()) + Math.floor(Math.random() * 1000);
     const sign = crypto.createHash('md5').update(appid + q + salt + key).digest('hex');
-
-    await baiduThrottle();                      // 遵守免费版 QPS 限制
 
     const res = await axios.get('https://fanyi-api.baidu.com/api/trans/vip/translate', {
         params: { q, from: 'auto', to, appid, salt, sign },
@@ -219,14 +210,36 @@ async function callDeepSeekReformat(text, target) {
 }
 
 /* ==================== 引擎调度 ==================== */
+
+/* ---------------------------------------------------------------------------
+ * QPS 节流（腾讯云 TMT 免费/基础版限制 5 次/秒，超了会报
+ *   "Your current request times equals to 5 in a second, which exceeds the..."
+ * 逐段翻译模式下前端会连续发很多请求，所以必须在服务端排队，
+ * 否则会出现"部分段落没翻译"的静默失败。
+ * 不同引擎分别计时，避免互相拖累。
+ * ------------------------------------------------------------------------- */
+const TENCENT_QPS_MS = parseInt(process.env.TENCENT_QPS_MS || '260', 10);  // 1000/5 ≈ 200，留余量
+const _lastCall = { tencent: 0, baidu: 0, deepseek: 0 };
+
+async function throttle(engine) {
+  const gap = engine === 'baidu'
+    ? parseInt(process.env.BAIDU_QPS_MS || '1100', 10)
+    : (engine === 'deepseek' ? 0 : TENCENT_QPS_MS);
+  if (gap <= 0) return;
+  const wait = (_lastCall[engine] || 0) + gap - Date.now();
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  _lastCall[engine] = Date.now();
+}
+
 async function route(engine, text, target, system) {
-    switch (engine) {
-        case 'deepseek': return await callDeepSeek(text, target, system);
-        case 'reformat': return await callDeepSeekReformat(text, target);
-        case 'baidu': return await callBaidu(text, target);
-        case 'tencent':
-        default: return await callTencent(text, target);
-    }
+  await throttle(engine);
+  switch (engine) {
+    case 'deepseek': return await callDeepSeek(text, target, system);
+    case 'reformat': return await callDeepSeekReformat(text, target);
+    case 'baidu': return await callBaidu(text, target);
+    case 'tencent':
+    default: return await callTencent(text, target);
+  }
 }
 
 /** 引擎失败时自动降级：baidu/deepseek 挂了就用腾讯云兜底，尽量不让用户白等 */

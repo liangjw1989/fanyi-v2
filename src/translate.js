@@ -36,6 +36,40 @@
 
   const TM = tmMod ? tmMod.TM : null;
 
+  /* ==========================================================================
+   * 传输层标记：⟦…⟧ 与引擎之间必须换一种"引擎不会吃掉"的写法
+   * --------------------------------------------------------------------------
+   * 实测（腾讯云机器翻译）：
+   *   ⟦0⟧ / [[0]] / {{0}} / <0>  →  句首的标记会被直接丢弃
+   *   ##0##                      →  绝大多数场景保留，但句首+上标符号(²)等场景仍会丢
+   * 结论：**不能依赖引擎保留任何带内标记**。
+   *   1) 先把 ⟦V12⟧/⟦P3⟧/⟦T4⟧ 换成 ##V12## 这类引擎友好写法（提高成功率）
+   *   2) 翻译后逐批校验标记数量；一旦发现丢失，该批改用"逐段单独翻译"兜底
+   *      —— 逐段翻译时没有标记，物理上不可能丢。
+   * ======================================================================== */
+  const MT_OPEN = '##', MT_CLOSE = '##';
+  const TOKEN_RE = new RegExp(core.SEG_OPEN + '([VPT]?)(\\d+)' + core.SEG_CLOSE, 'g');
+
+  /** 发送前：⟦V12⟧ → ##V12##（无字母前缀视为分段标记 V） */
+  function encodeMarkers(text) {
+    return String(text == null ? '' : text).replace(TOKEN_RE, (m, kind, num) => MT_OPEN + (kind || 'V') + num + MT_CLOSE);
+  }
+  /** 收到后：##V12## → ⟦12⟧，##P3## → ⟦P3⟧ */
+  function decodeMarkers(text) {
+    return String(text == null ? '' : text)
+      .replace(/##\s*V(\d+)\s*##/g, (m, n) => core.SEG_OPEN + n + core.SEG_CLOSE)
+      .replace(/##\s*([PT])(\d+)\s*##/g, (m, k, n) => core.SEG_OPEN + k + n + core.SEG_CLOSE);
+  }
+  /** 统计一段文本里所有标记的数量（用于发现引擎丢标记） */
+  function countMarkers(text) {
+    const m = String(text == null ? '' : text).match(/##\s*[VPT]?\d+\s*##/g);
+    return m ? m.length : 0;
+  }
+  /** 取出一段文本里的所有标记（含编号），用于精确比对 */
+  function listMarkers(text) {
+    return String(text == null ? '' : text).match(/##\s*[VPT]?\d+\s*##/g) || [];
+  }
+
   /** 批量翻译时给大模型的系统提示：只翻译，绝不改动结构与占位符 */
   function buildSystemPrompt(target, mode) {
     const lang = LANG_NAME[target] || target;
@@ -43,10 +77,11 @@
       '你是一名专业学术文献翻译排版引擎。你的唯一任务是把用户给出的片段翻译成 ' + lang + '。',
       '',
       '严格遵守以下规则：',
-      '1. 输入由若干片段组成，每个片段用 ⟦数字⟧ 标记包裹（首尾各一次）。',
+      '1. 输入由若干片段组成，每个片段用 ##V数字## 标记包裹（首尾各一次）。',
       '   输出必须包含完全相同的标记：数量一致、编号一致、顺序一致，一个都不能少、不能多。',
       '   绝对不要翻译、改写、删除、重排这些标记，也不要自己新增标记。',
-      '2. 片段内部可能出现 ⟦P0⟧ ⟦T1⟧ 这类占位符，它们代表数字、单位、公式、参考文献编号、',
+      '   特别注意：**开头那一个标记也必须原样出现在输出的最前面**。',
+      '2. 片段内部可能出现 ##P0## ##T1## 这类占位符，它们代表数字、单位、公式、参考文献编号、',
       '   图表编号、希腊字母或已定术语。必须原样保留，不能翻译、不能改成别的写法、不能移动位置。',
       '3. 每个片段独立翻译，不要跨片段合并句子，不要输出任何解释、标题或多余文字。',
       '4. 保持片段内部的换行与分句结构；学术语气，术语前后统一。',
@@ -62,7 +97,7 @@
     const f = opts.fetchImpl || (typeof fetch !== 'undefined' ? fetch : null);
     if (!f) throw new Error('当前环境不支持 fetch');
     const body = {
-      text: opts.text,
+      text: encodeMarkers(opts.text),          // ⟦V3⟧ → ##V3##（引擎友好写法）
       target: TENCENT_CODE[opts.target] || opts.target,
       engine: opts.engine || 'tencent'
     };
@@ -74,7 +109,7 @@
     });
     const data = await res.json();
     if (!data || data.code !== 0) throw new Error((data && data.result) || '翻译接口返回错误');
-    return data.result;
+    return decodeMarkers(data.result);       // ##V3## → ⟦3⟧
   }
 
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -92,7 +127,7 @@
       } catch (e) { text = null; }
       out.push(text);
       if (onProgress) onProgress(i + 1, units.length);
-      await sleep(opts.delay == null ? 260 : opts.delay);
+      await sleep(opts.delay == null ? 120 : opts.delay);   // 真正的 QPS 限流在云函数里做
     }
     return out;
   }
@@ -126,7 +161,8 @@
     const units = core.eachTextUnit(ir);
     const stat = {
       total: units.length, translated: 0, fallback: 0, fromCache: 0,
-      termsApplied: 0, symbols: 0, tmSaved: 0, missingSymbols: [], calls: 0
+      termsApplied: 0, symbols: 0, tmSaved: 0, missingSymbols: [], calls: 0,
+      markerLoss: 0, perSegmentFallback: 0, symbolRetries: 0, unitRetries: 0
     };
     if (!units.length) return stat;
 
@@ -172,56 +208,129 @@
     const system = buildSystemPrompt(opts.target, opts.mode);
     const engine = opts.engine || 'tencent';
 
-    /* ---- 3) 逐批翻译 ---- */
+    /* ---- 3) 逐批翻译 ----
+     * 实测：腾讯云机器翻译会随机丢弃句首的标记（⟦⟧ 和 ##n## 都会丢），
+     * 一旦标记被丢，这一批的分段就对不上了。处理策略：
+     *   · 先按批翻译（快，接口调用少）
+     *   · 发现标记丢失 → 该批改用「逐段翻译」（请求里只有一个片段，
+     *     标记由程序自己加，物理上不可能丢）
+     *   · 若连续两批都丢标记，说明这个引擎不靠谱，后面直接全部逐段，
+     *     不再浪费重试时间
+     * mode='safe' 时跳过批量，直接逐段（最稳，但调用次数=片段数）
+     */
+    const safeMode = opts.mode === 'safe';
+    let reliable = !safeMode;
+    let consecutiveLoss = 0;
+
     let done = stat.fromCache;
     for (const batch of batches) {
       const refs = batch.items.map(x => x.ref);
+      /* 这批理应带回的标记（分段标记 + 占位符），用于发现引擎"吃掉"标记 */
+      const wantMarkers = batch.items.reduce(
+        (a, x) => a + 2 + ((x.ref && x.ref.items) ? x.ref.items.length : 0), 0);
       let payloads = null;
       let attempt = 0;
-      const retries = opts.retries == null ? 2 : opts.retries;
+      const retries = reliable ? (opts.retries == null ? 2 : opts.retries) : 0;
+      let lostMarkers = false;
 
-      while (attempt <= retries && !payloads) {
+      while (reliable && attempt <= retries && !payloads) {
         try {
           const raw = await callOnce({
             apiUrl: opts.apiUrl, text: batch.text, target: opts.target,
             engine: engine, system: system, fetchImpl: opts.fetchImpl
           });
           stat.calls++;
+          /* 标记少了 → 引擎破坏了结构，这一批不可信，直接换逐段翻译 */
+          if (wantMarkers > 0 && listMarkers(raw).length < wantMarkers) {
+            stat.markerLoss++;
+            lostMarkers = true;
+            throw new Error('引擎丢失标记（期望 ' + wantMarkers + ' 个，返回 ' + listMarkers(raw).length + ' 个）');
+          }
           const parsed = core.parseSegments(raw, batch.items.length);
           const got = parsed.filter(x => x != null && x !== '').length;
           if (got >= Math.max(1, Math.ceil(batch.items.length * 0.9))) payloads = parsed;
         } catch (e) {
-          await sleep(600 * (attempt + 1));
+          if (!lostMarkers) await sleep(600 * (attempt + 1));
         }
         attempt++;
       }
 
+      if (lostMarkers) {
+        consecutiveLoss++;
+        if (consecutiveLoss >= 2 && reliable) {
+          reliable = false;
+          if (opts.onProgress) {
+            opts.onProgress(done, units.length,
+              '检测到当前引擎会破坏分段标记，后续改为逐段翻译（更稳，速度稍慢）');
+          }
+        }
+      } else if (payloads) {
+        consecutiveLoss = 0;
+      }
+
       if (!payloads) {
+        /* 逐段单独翻译：请求里只有一个片段，标记由程序自己包，物理上不可能丢 */
         payloads = await translateOneByOne(refs, {
           apiUrl: opts.apiUrl, target: opts.target, system: system,
           engine: engine, fetchImpl: opts.fetchImpl, delay: opts.delay, fallbackEngine: engine
         }, null);
         stat.calls += refs.length;
+        stat.perSegmentFallback += refs.length;
       }
 
-      refs.forEach((u, i) => {
+      /* 逐段处理：发现占位符被引擎吞掉时，单独重译这一段。
+       * 实测这类丢失是随机的（同一段重发往往就能保住），所以重试非常有效。 */
+      for (let i = 0; i < refs.length; i++) {
+        const u = refs[i];
         const raw = payloads[i];
-        if (raw == null || raw === '') {
+        let text = null;
+        let lost = [];
+
+        if (raw != null && raw !== '') {
+          if (u.items && u.items.length) {
+            const r0 = glossary.restore(raw, u.items);
+            text = r0.text;
+            lost = r0.missing || [];
+          } else {
+            /* 没开保护时也可能残留 ##Tn## 形态，稳妥起见再解一次 */
+            text = decodeMarkers(raw);
+          }
+        }
+
+        let tries = 0;
+        const maxUnitRetry = (u.items && u.items.length) ? (opts.unitRetries == null ? 2 : opts.unitRetries) : 0;
+        while (lost.length && tries < maxUnitRetry) {
+          tries++;
+          try {
+            const again = await translateOneByOne([u], {
+              apiUrl: opts.apiUrl, target: opts.target, system: system,
+              engine: engine, fetchImpl: opts.fetchImpl, delay: opts.delay, fallbackEngine: engine
+            }, null);
+            stat.calls++;
+            if (again[0] != null && again[0] !== '') {
+              const r2 = glossary.restore(again[0], u.items);
+              /* 只有这次丢得更少才采用，避免越试越差 */
+              if ((r2.missing || []).length < lost.length) {
+                text = r2.text;
+                lost = r2.missing || [];
+              }
+            }
+          } catch (e) { /* 忽略，保留已有结果 */ }
+        }
+        stat.symbolRetries += tries;
+        stat.unitRetries += tries;
+
+        if (text == null || text === '') {
           core.applyTranslation(ir, u, null);
           stat.fallback++; done++;
-          return;
+        } else {
+          if (lost.length) stat.missingSymbols = stat.missingSymbols.concat(lost);
+          core.applyTranslation(ir, u, text);
+          tmStore(u, opts, text);
+          stat.tmSaved++;
+          stat.translated++; done++;
         }
-        let text = raw;
-        if (u.items && u.items.length) {
-          const r = glossary.restore(raw, u.items);
-          text = r.text;
-          if (r.missing.length) stat.missingSymbols = stat.missingSymbols.concat(r.missing);
-        }
-        core.applyTranslation(ir, u, text);
-        tmStore(u, opts, text);
-        stat.tmSaved++;
-        stat.translated++; done++;
-      });
+      }
 
       if (opts.onProgress) opts.onProgress(done, units.length, '已翻译 ' + done + '/' + units.length + ' 段');
       await sleep(opts.delay == null ? 200 : opts.delay);
@@ -240,6 +349,7 @@
 
   return {
     translateIR, callOnce, buildSystemPrompt, translateOneByOne,
+    encodeMarkers, decodeMarkers, countMarkers, listMarkers,
     LANG_NAME, TENCENT_CODE
   };
 });
