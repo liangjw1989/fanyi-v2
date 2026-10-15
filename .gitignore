@@ -1,0 +1,55 @@
+# ===== 灵译 LingYi · 仓库忽略清单 =====
+
+# --- 字体：本版本不使用（pdfmake 方案遗留），体积大且非必需 ---
+vfs_fonts.js
+思源vfs_fonts.js
+*.ttf
+*.otf
+*.woff
+*.woff2
+
+# --- 构建/安装备份与旧版文件 ---
+_backup-*/
+*.bak
+index.txt
+repo/
+dist/index.debug.html
+dist/src/
+
+# --- 真实测试样本（真实论文原稿 / 数据库导出 / 已发表论文，含隐私与版权，不入库）---
+# 注意：twocol.docx、oncol.docx、twocol.synthetic.pdfjs.json 是**合成**样本，要入库，
+#       所以这里逐条排除真实材料，而不是用 *.docx 之类的通配符。
+test/samples/sample1.docx
+test/samples/sample1.doc
+test/samples/sample2.doc
+test/samples/sample_pdf_1p.pdf
+test/samples/sample1.mammoth-like.html
+test/samples/sample1.docx-inspect.json
+test/samples/twocol.pdfjs.json
+test/samples/paper1.pdfjs.json
+test/samples/paper2.pdfjs.json
+test/samples/twocol.pdf
+test/samples/paper1.pdf
+test/samples/paper2.pdf
+test/samples/oncol.pdf
+test/samples/*.keep
+
+# --- 测试与构建产物 ---
+test/out/
+node_modules/
+
+# --- 截图/大文件（需要请挂 Release） ---
+演示/*.pdf
+演示/*.png
+演示/*.jpg
+
+# --- 系统与编辑器 ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.log
+*.tmp
+__pycache__/
+*.pyc

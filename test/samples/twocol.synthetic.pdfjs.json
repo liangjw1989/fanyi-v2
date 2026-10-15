@@ -1,0 +1,876 @@
+[
+ {
+  "page": 1,
+  "width": 595.3,
+  "height": 841.9,
+  "styles": {
+   "f_SimHei": {
+    "fontFamily": "SimHei",
+    "ascent": 0.8,
+    "descent": -0.2
+   },
+   "f_SimSun": {
+    "fontFamily": "SimSun",
+    "ascent": 0.8,
+    "descent": -0.2
+   },
+   "f_KaiTi": {
+    "fontFamily": "KaiTi",
+    "ascent": 0.8,
+    "descent": -0.2
+   }
+  },
+  "items": [
+   {
+    "str": "先天性心脏病患儿围手术期护理质量评价指标体系的构建",
+    "dir": "ltr",
+    "width": 420,
+    "height": 15,
+    "transform": [
+     15,
+     0,
+     0,
+     15,
+     88,
+     70
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimHei",
+    "hasEOL": false
+   },
+   {
+    "str": "张 三，李 四，王 五",
+    "dir": "ltr",
+    "width": 135,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     230,
+     92
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "（某某大学附属医院 心脏外科，北京 100000）",
+    "dir": "ltr",
+    "width": 235,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     180,
+     108
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "【摘要】 目的 构建先天性心脏病患儿围手术期护理质量评价指标体系。方法 采用文献回顾与德尔菲法，对 30 名专家进行两轮函询。结果 最终形成包含 3 个一级指标、12 个二级指标和 46 个三级指标的体系。结论 该指标体系具有较好的科学性与实用性。",
+    "dir": "ltr",
+    "width": 470,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     62,
+     132
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_KaiTi",
+    "hasEOL": false
+   },
+   {
+    "str": "【关键词】 先天性心脏病；围手术期；护理质量；德尔菲法",
+    "dir": "ltr",
+    "width": 300,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     62,
+     158
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_KaiTi",
+    "hasEOL": false
+   },
+   {
+    "str": "1　对象与方法",
+    "dir": "ltr",
+    "width": 90,
+    "height": 12,
+    "transform": [
+     12,
+     0,
+     0,
+     12,
+     62,
+     200
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimHei",
+    "hasEOL": false
+   },
+   {
+    "str": "1.1　研究对象",
+    "dir": "ltr",
+    "width": 80,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     222
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimHei",
+    "hasEOL": false
+   },
+   {
+    "str": "采用便利抽样法，选取 2024 年 1 月至 2025 年 6 月",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     240
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "在我院心脏外科行手术治疗的先天性心脏病患儿共",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     256
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "216 例作为研究对象。纳入标准：（1）年龄 0～14 岁；",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     272
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "（2）经超声心动图确诊；（3）行体外循环下心内直视",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     288
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "手术。排除标准：（1）合并其他严重脏器疾病；",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     304
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "（2）资料不完整者。本研究经医院伦理委员会审批通过。",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     320
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "1.2　研究方法",
+    "dir": "ltr",
+    "width": 80,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     342
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimHei",
+    "hasEOL": false
+   },
+   {
+    "str": "首先通过系统检索中国知网、万方、PubMed 等数据库，",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     360
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "检索时限为建库至 2024 年 12 月，初筛获得相关文献",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     376
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "1246 篇，经去重、阅读题目与摘要后纳入 86 篇，最终",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     392
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "提取指标条目 78 项。随后采用德尔菲法进行两轮专家函询，",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     408
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "专家纳入标准为：本科及以上学历、中级及以上职称。",
+    "dir": "ltr",
+    "width": 220,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     62,
+     424
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "2　结果",
+    "dir": "ltr",
+    "width": 60,
+    "height": 12,
+    "transform": [
+     12,
+     0,
+     0,
+     12,
+     320,
+     200
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimHei",
+    "hasEOL": false
+   },
+   {
+    "str": "2.1　专家基本情况",
+    "dir": "ltr",
+    "width": 110,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     320,
+     222
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimHei",
+    "hasEOL": false
+   },
+   {
+    "str": "两轮函询均发放问卷 30 份，回收有效问卷 30 份，",
+    "dir": "ltr",
+    "width": 210,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     320,
+     240
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "有效回收率 100%。专家年龄（42.6±7.3）岁，工作",
+    "dir": "ltr",
+    "width": 210,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     320,
+     256
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "年限（19.4±6.8）年，均具有丰富的儿科心脏专科经验。",
+    "dir": "ltr",
+    "width": 210,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     320,
+     272
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "表 1　两轮函询专家意见协调程度",
+    "dir": "ltr",
+    "width": 150,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     360,
+     294
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimHei",
+    "hasEOL": false
+   },
+   {
+    "str": "轮次",
+    "dir": "ltr",
+    "width": 18,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     330,
+     310
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "指标数",
+    "dir": "ltr",
+    "width": 18,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     385,
+     310
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "和谐系数 W",
+    "dir": "ltr",
+    "width": 29.700000000000003,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     440,
+     310
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "χ² 值",
+    "dir": "ltr",
+    "width": 19.8,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     500,
+     310
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "第一轮",
+    "dir": "ltr",
+    "width": 18,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     330,
+     324
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "78",
+    "dir": "ltr",
+    "width": 18,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     385,
+     324
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "0.216",
+    "dir": "ltr",
+    "width": 24.750000000000004,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     440,
+     324
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "152.36",
+    "dir": "ltr",
+    "width": 29.700000000000003,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     500,
+     324
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "第二轮",
+    "dir": "ltr",
+    "width": 18,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     330,
+     338
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "61",
+    "dir": "ltr",
+    "width": 18,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     385,
+     338
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "0.342",
+    "dir": "ltr",
+    "width": 24.750000000000004,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     440,
+     338
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "198.74",
+    "dir": "ltr",
+    "width": 29.700000000000003,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     500,
+     338
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "最终",
+    "dir": "ltr",
+    "width": 18,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     330,
+     352
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "61",
+    "dir": "ltr",
+    "width": 18,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     385,
+     352
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "0.386",
+    "dir": "ltr",
+    "width": 24.750000000000004,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     440,
+     352
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "221.05",
+    "dir": "ltr",
+    "width": 29.700000000000003,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     500,
+     352
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "注：W 值越大表示专家意见协调程度越高。",
+    "dir": "ltr",
+    "width": 200,
+    "height": 8,
+    "transform": [
+     8,
+     0,
+     0,
+     8,
+     320,
+     370
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "2.2　指标体系构成",
+    "dir": "ltr",
+    "width": 110,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     320,
+     388
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimHei",
+    "hasEOL": false
+   },
+   {
+    "str": "最终构建的指标体系包含一级指标 3 项（结构质量、",
+    "dir": "ltr",
+    "width": 210,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     320,
+     406
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "过程质量、结果质量），二级指标 12 项，三级指标",
+    "dir": "ltr",
+    "width": 210,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     320,
+     422
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "46 项。一级指标权重分别为 0.286、0.428 和 0.286。",
+    "dir": "ltr",
+    "width": 210,
+    "height": 10.5,
+    "transform": [
+     10.5,
+     0,
+     0,
+     10.5,
+     320,
+     438
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "参考文献",
+    "dir": "ltr",
+    "width": 60,
+    "height": 12,
+    "transform": [
+     12,
+     0,
+     0,
+     12,
+     320,
+     464
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimHei",
+    "hasEOL": false
+   },
+   {
+    "str": "[1] 王某某, 李某某. 儿科护理质量评价研究进展[J]. 中华护理杂志, 2023, 58(12): 1495-1500.",
+    "dir": "ltr",
+    "width": 210,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     320,
+     482
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "[2] Donabedian A. The quality of care: how can it be assessed?[J]. JAMA, 1988, 260(12): 1743-1748.",
+    "dir": "ltr",
+    "width": 210,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     320,
+     496
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   },
+   {
+    "str": "[3] 张某, 刘某. 德尔菲法在护理指标构建中的应用[J]. 护理研究, 2022, 36(8): 1402-1406.",
+    "dir": "ltr",
+    "width": 210,
+    "height": 9,
+    "transform": [
+     9,
+     0,
+     0,
+     9,
+     320,
+     510
+    ],
+    "pageHeight": 841.9,
+    "fontName": "f_SimSun",
+    "hasEOL": false
+   }
+  ]
+ }
+]

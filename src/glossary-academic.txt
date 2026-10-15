@@ -1,0 +1,138 @@
+# 灵译 · 学术/医学常用术语库（内置）
+# ---------------------------------------------------------------
+# 用法：
+#   1) 程序里"术语库"面板直接粘贴下面内容即可启用
+#   2) 也可以自己增删：每行一条，格式为  源词 = 目标译法
+#   3) # 开头的是注释，不会生效
+#
+# 说明：这里放的是"翻译引擎容易译错、或前后译名不统一"的词。
+#       通用词（如"结果""方法"）交给引擎即可，不必列进来。
+
+# ===== 通用学术 =====
+摘要 = Abstract
+关键词 = Keywords
+参考文献 = References
+引言 = Introduction
+材料与方法 = Materials and methods
+对象与方法 = Subjects and methods
+结果 = Results
+讨论 = Discussion
+结论 = Conclusion
+致谢 = Acknowledgements
+作者贡献声明 = Author contributions
+利益冲突 = Conflict of interest
+伦理审批 = ethical approval
+知情同意 = informed consent
+纳入标准 = inclusion criteria
+排除标准 = exclusion criteria
+回顾性研究 = retrospective study
+前瞻性研究 = prospective study
+横断面研究 = cross-sectional study
+队列研究 = cohort study
+病例对照研究 = case-control study
+随机对照试验 = randomized controlled trial
+多中心研究 = multicenter study
+样本量 = sample size
+统计学意义 = statistical significance
+差异有统计学意义 = the difference was statistically significant
+敏感性分析 = sensitivity analysis
+亚组分析 = subgroup analysis
+多因素回归分析 = multivariate regression analysis
+logistic回归 = logistic regression
+线性回归 = linear regression
+相关分析 = correlation analysis
+单因素方差分析 = one-way analysis of variance
+非参数检验 = nonparametric test
+正态性检验 = normality test
+中位数 = median
+四分位数 = quartile
+四分位距 = interquartile range
+标准差 = standard deviation
+标准误 = standard error
+均值 = mean
+置信区间 = confidence interval
+优势比 = odds ratio
+风险比 = hazard ratio
+相对危险度 = relative risk
+受试者工作特征曲线 = receiver operating characteristic curve
+曲线下面积 = area under the curve
+组内相关系数 = intraclass correlation coefficient
+变异系数 = coefficient of variation
+阈值 = threshold
+截断值 = cutoff value
+剂量-反应关系 = dose-response relationship
+非线性关系 = non-linear relationship
+混杂因素 = confounding factor
+校正后 = after adjustment
+倾向性评分匹配 = propensity score matching
+
+# ===== 生殖医学 / 男科 =====
+不育症 = infertility
+男性不育 = male infertility
+不育男性 = infertile men
+精子 = sperm
+精液 = semen
+精液分析 = semen analysis
+精液参数 = semen parameters
+精子浓度 = sperm concentration
+精子总数 = total sperm count
+精子活力 = sperm motility
+前向运动精子 = progressive motile sperm
+精子形态 = sperm morphology
+正常形态精子率 = normal sperm morphology rate
+精子DNA碎片化指数 = sperm DNA fragmentation index
+精子DNA完整性 = sperm DNA integrity
+精浆 = seminal plasma
+禁欲时间 = abstinence duration
+取精 = semen collection
+液化时间 = liquefaction time
+精索静脉曲张 = varicocele
+少精子症 = oligozoospermia
+弱精子症 = asthenozoospermia
+畸形精子症 = teratozoospermia
+无精子症 = azoospermia
+辅助生殖技术 = assisted reproductive technology
+体外受精 = in vitro fertilization
+卵胞浆内单精子注射 = intracytoplasmic sperm injection
+胚胎移植 = embryo transfer
+临床妊娠率 = clinical pregnancy rate
+流产率 = miscarriage rate
+活产率 = live birth rate
+复发性流产 = recurrent pregnancy loss
+染色体 = chromosome
+染色体核型 = karyotype
+染色体倒位 = chromosomal inversion
+染色体多态性 = chromosomal polymorphism
+臂间倒位 = pericentric inversion
+臂内倒位 = paracentric inversion
+易位 = translocation
+缺失 = deletion
+重复 = duplication
+嵌合体 = mosaicism
+非整倍体 = aneuploidy
+外周血淋巴细胞培养 = peripheral blood lymphocyte culture
+G显带 = G-banding
+核型分析 = karyotype analysis
+遗传咨询 = genetic counseling
+产前诊断 = prenatal diagnosis
+
+# ===== 指标与缩写（保持原样，不做翻译）=====
+DNA = DNA
+RNA = RNA
+BMI = BMI
+DFI = DFI
+WHO = WHO
+SPSS = SPSS
+R语言 = R software
+P值 = P value
+H值 = H value
+W值 = W value
+χ²值 = χ² value
+
+# ===== 单位与统计符号（通常由程序自动保护，写进来更保险）=====
+kg/m² = kg/m²
+×10⁶/mL = ×10⁶/mL
+mL = mL
+μL = μL
+r/min = r/min
+℃ = ℃

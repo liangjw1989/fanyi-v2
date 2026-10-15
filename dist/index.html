@@ -1,0 +1,4171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<!--
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.2.0
+  © 2026 LingYi. All rights reserved.
+  许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
+  本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
+-->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>灵译 · 文档翻译（保留原排版）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+  <!-- 第三方库（需联网加载；本地 vendor/ 目录存在时优先用本地） -->
+  <script src="./vendor/qrcode.min.js" onerror="this.remove()"></script>
+  <script>window.QRCode || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>');</script>
+
+  <script src="./vendor/pdf.min.js" onerror="this.remove()"></script>
+  <script>window.pdfjsLib || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');</script>
+
+  <script src="./vendor/mammoth.browser.min.js" onerror="this.remove()"></script>
+  <script>window.mammoth || document.write('<script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"><\/script>');</script>
+
+  <script src="./vendor/docx.umd.js" onerror="this.remove()"></script>
+  <script>window.docx || document.write('<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"><\/script>');</script>
+
+  <script src="./vendor/marked.min.js" onerror="this.remove()"></script>
+  <script>window.marked || document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');</script>
+
+  <script src="./vendor/tesseract.min.js" onerror="this.remove()"></script>
+  <script>window.Tesseract || document.write('<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"><\/script>');</script>
+
+  <style>
+    /* ==================== CSS 变量定义 ==================== */
+    :root {
+      --primary: #4f6ef7;
+      --primary-dark: #3b54d4;
+      --primary-light: #eef2ff;
+      --gradient-1: linear-gradient(135deg, #4f6ef7, #7b5cff);
+      --gradient-2: linear-gradient(135deg, #4f6ef7, #a855f7, #ec4899);
+      --bg: #f0f4fd;
+      --bg-card: rgba(255,255,255,0.75);
+      --text: #1e293b;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 20px 40px -12px rgba(0,0,0,0.12);
+      --radius: 2rem;
+      --radius-sm: 1rem;
+      --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(145deg, #f0f4fd 0%, #e6ebf7 50%, #f8fafc 100%);
+      min-height: 100vh; display: flex; justify-content: center;
+      color: var(--text); padding: 1rem; -webkit-font-smoothing: antialiased;
+    }
+    body::before {
+      content: ''; position: fixed; top: -50%; right: -30%; width: 80vw; height: 80vw;
+      background: radial-gradient(circle, rgba(79,110,247,0.06) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .app-wrapper { width: 100%; max-width: 1200px; display: flex; flex-direction: column; gap: 1.5rem; position: relative; z-index: 1; }
+    .card {
+      background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,0.8); transition: var(--transition);
+    }
+    .card:hover { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); }
+    .top-bar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; }
+    .brand { display:flex; align-items:center; gap:0.75rem; }
+    .brand-icon {
+      background: var(--gradient-1); width:48px; height:48px; border-radius:18px;
+      display:flex; align-items:center; justify-content:center; color:white; font-size:24px;
+      box-shadow: 0 10px 20px -5px rgba(79,110,247,0.4); animation: pulse 3s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 10px 20px -5px rgba(79,110,247,0.4); }
+      50% { box-shadow: 0 15px 30px -5px rgba(79,110,247,0.6); }
+    }
+    .brand-text h1 { font-weight:700; font-size:1.8rem; background:linear-gradient(to right,#1e293b,#334155); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .brand-text span { font-size:0.8rem; color:var(--text-secondary); font-weight:500; }
+    .qr-section { display:flex; align-items:center; gap:0.8rem; cursor:pointer; transition:var(--transition); padding:0.4rem 0.8rem; border-radius:2rem; background:rgba(255,255,255,0.5); }
+    .qr-section:hover { transform:scale(1.05); background:rgba(255,255,255,0.8); }
+    .qr-code-wrapper { width:40px; height:40px; border-radius:12px; padding:2px; background:var(--gradient-2); box-shadow:0 4px 12px rgba(79,110,247,0.3); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .qr-code-inner { width:36px; height:36px; border-radius:10px; background:white; overflow:hidden; }
+    .qr-text { font-size:0.8rem; color:var(--text-secondary); font-weight:500; white-space:nowrap; }
+    .btn { padding:0.5rem 1.2rem; border-radius:2rem; font-weight:600; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:0.5rem; transition:0.2s; font-size:0.85rem; font-family:inherit; white-space:nowrap; }
+    .btn:active { transform:scale(0.96); }
+    .btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .btn-primary { background:var(--gradient-1); color:white; box-shadow:0 4px 15px rgba(79,110,247,0.3); }
+    .btn-primary:hover:not(:disabled) { background:linear-gradient(135deg,#3b54d4,#6a4be0); }
+    .btn-outline { background:white; border:1.5px solid var(--border); color:#334155; }
+    .btn-outline:hover { background:#f8fafc; border-color:var(--primary); }
+    .btn-danger { background:#ef4444; color:white; }
+    .btn-sm { padding:0.3rem 0.8rem; font-size:0.75rem; }
+    .tabs { display:flex; gap:0.3rem; margin-bottom:1.5rem; background:#e2e8f0; padding:0.3rem; border-radius:2rem; width:fit-content; }
+    .tab-btn { border:none; background:transparent; color:#64748b; padding:0.6rem 1.8rem; border-radius:1.8rem; font-weight:600; cursor:pointer; transition:all 0.3s ease; font-size:0.9rem; }
+    .tab-btn.active { background:white; color:var(--primary); box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    .upload-area { border:2px dashed #cbd5e1; border-radius:1rem; padding:1.2rem 1rem; text-align:center; cursor:pointer; background:rgba(248,250,252,0.7); margin:0.8rem 0; transition:0.2s; position:relative; }
+    .upload-area:hover { border-color:var(--primary); background:var(--primary-light); }
+    .upload-area.drag-over { border-color:var(--primary); background:#eef2ff; transform:scale(1.01); }
+    .upload-title { font-weight:600; font-size:0.95rem; margin-bottom:0.2rem; }
+    .upload-hint { font-size:0.75rem; color:var(--text-secondary); }
+    .file-item { background:white; border-radius:1rem; padding:0.9rem; margin-bottom:0.6rem; display:flex; align-items:center; gap:0.8rem; border:1px solid var(--border); flex-wrap:wrap; transition:0.2s; animation:slideIn 0.3s ease-out; }
+    @keyframes slideIn { from { opacity:0; transform:translateY(-10px);} to { opacity:1; transform:translateY(0);} }
+    .file-item:hover { border-color:var(--primary); box-shadow:0 2px 10px rgba(0,0,0,0.05); }
+    .file-info { flex:1; min-width:140px; }
+    .file-name { font-weight:600; font-size:0.9rem; word-break:break-all; }
+    .progress-bar { width:80px; height:5px; background:#e2e8f0; border-radius:10px; overflow:hidden; margin-top:0.3rem; }
+    .progress-fill { height:100%; background:var(--gradient-1); width:0%; transition:0.3s; }
+    .file-actions { display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap; }
+    select { padding:0.35rem 0.6rem; border-radius:0.6rem; border:1px solid var(--border); font-size:0.75rem; background:white; }
+    .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter:blur(4px); align-items:center; justify-content:center; z-index:1000; }
+    .modal.active { display:flex; }
+    .modal-content { background:white; border-radius:1.5rem; padding:1.5rem; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; }
+    .close-modal { float:right; cursor:pointer; font-size:1.4rem; color:#94a3b8; }
+    .toast-notification { position:fixed; bottom:2rem; right:2rem; background:#1e293b; color:white; padding:0.8rem 1.5rem; border-radius:2rem; transform:translateY(100px); opacity:0; transition:0.3s; z-index:999; max-width:70vw; }
+    .toast-notification.show { transform:translateY(0); opacity:1; }
+    .footer-hint { text-align:center; font-size:0.75rem; color:#64748b; background:rgba(255,255,255,0.6); padding:0.6rem; border-radius:1.5rem; backdrop-filter:blur(10px); margin-top:0.5rem; }
+    .form-group { margin-bottom:0.8rem; }
+    .form-group label { display:block; font-size:0.8rem; color:#475569; margin-bottom:0.3rem; font-weight:600; }
+    .form-group input { width:100%; padding:0.6rem 0.8rem; border-radius:0.7rem; border:1px solid var(--border); font-size:0.9rem; }
+    .stage-hint { font-size:0.75rem; color:var(--text-secondary); margin-top:0.35rem; }
+    .fmt-note { background:#f8fafc; border:1px dashed #cbd5e1; border-radius:0.8rem; padding:0.7rem 0.9rem; font-size:0.78rem; color:#475569; line-height:1.6; margin-top:0.8rem; }
+    .fmt-note b { color:var(--primary); }
+    #translateFileList { counter-reset: translateCounter; }
+    #translateFileList .file-item { counter-increment: translateCounter; }
+    #translateFileList .file-item::before { content: counter(translateCounter); background:var(--gradient-1); color:white; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; flex-shrink:0; }
+    #completedList { counter-reset: completedCounter; }
+    #completedList .file-item { counter-increment: completedCounter; }
+    #completedList .file-item::before { content: counter(completedCounter); background:var(--gradient-1); color:white; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; flex-shrink:0; }
+    @media (max-width: 768px) {
+      body { padding:0.5rem; }
+      .card { padding:1rem; border-radius:1.5rem; }
+      .brand-text h1 { font-size:1.4rem; }
+      .btn { padding:0.4rem 1rem; font-size:0.8rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <div class="card top-bar">
+    <div class="brand">
+      <div class="brand-icon">🌐</div>
+      <div class="brand-text">
+        <h1>灵译</h1>
+        <span>文档翻译 · 保留原排版</span>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+      <span id="loginStatus" style="font-size:0.85rem; color:#475569; font-weight:500;"></span>
+      <button class="btn btn-outline btn-sm" id="loginBtn">👤 登录</button>
+      <button class="btn btn-outline btn-sm" id="historyBtn" style="display:none;">🕐 记录</button>
+      <button class="btn btn-outline btn-sm" id="logoutBtn" style="display:none;">🚪 退出</button>
+      <div class="qr-section" id="qrSection">
+        <div class="qr-code-wrapper"><div class="qr-code-inner" id="qrContainer"></div></div>
+        <span class="qr-text">扫码打开</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label for="translateFileInput" class="upload-area" id="translateUpload" style="cursor:pointer; display:block;">
+      <div style="font-size:2.5rem; color:var(--primary); margin-bottom:0.5rem;">📄</div>
+      <div class="upload-title">点击上传需翻译的文件</div>
+      <div class="upload-hint">PDF · Word(.docx) · TXT · Markdown · 图片（保留字号、对齐、缩进、表格、分栏）</div>
+      <div class="upload-hint mobile-warning" style="display:none; color:#e67e22; margin-top:0.5rem;">
+        ⚠️ 如无法选择文档，请点击右上角「…」→「在浏览器中打开」
+      </div>
+    </label>
+    <input type="file" id="translateFileInput" multiple accept=".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg" style="display:none;">
+    <div class="fmt-note">
+      <b>保版式翻译流程：</b>解析原文件结构（段落 / 字号 / 对齐 / 缩进 / 表格 / 分栏）→ 只翻译文字、不重排结构 → 按原骨架重新生成文件。
+      输出 <b>Word</b> 可 1:1 保留版式；输出 <b>PDF</b> 由浏览器打印生成，版式同样保留。
+    </div>
+
+    <!-- ==================== 术语库 / 翻译记忆 / 符号保护 ==================== -->
+    <div style="margin-top:0.9rem;">
+      <button class="btn btn-outline btn-sm" id="toggleToolsBtn">⚙️ 术语库 · 翻译记忆 · 符号保护</button>
+      <span id="toolsSummary" style="font-size:0.78rem; color:#64748b; margin-left:0.6rem;"></span>
+    </div>
+
+    <div id="toolsPanel" style="display:none; margin-top:0.8rem; border:1px solid var(--border); border-radius:1rem; padding:1rem; background:#fff;">
+      <div style="font-weight:600; margin-bottom:0.6rem;">🔌 翻译服务设置</div>
+      <div style="font-size:0.78rem; color:#64748b; margin-bottom:0.3rem;">
+        填入你自己的翻译服务（云函数）地址。程序里<b>不保存任何密钥</b>：
+        腾讯云 SecretId/Key、DeepSeek API Key 都放在云函数的环境变量里。
+        留空则无法翻译。
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap;">
+        <input type="text" id="apiUrlInput" spellcheck="false" placeholder="https://你的云函数地址"
+          style="flex:1; min-width:240px; padding:0.5rem 0.7rem; border:1px solid var(--border); border-radius:0.6rem; font-size:0.8rem; font-family:Consolas,monospace;">
+        <button class="btn btn-primary btn-sm" id="saveApiBtn">保存</button>
+        <button class="btn btn-outline btn-sm" id="testApiBtn">测试连接</button>
+      </div>
+      <div id="apiStatus" style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.6rem;">
+        未配置。参考 README「后端接口约定」自行部署云函数，或向服务提供者索取地址。
+      </div>
+
+      <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
+
+      <div style="font-weight:600; margin-bottom:0.6rem;">🛡️ 翻译质量控制</div>
+
+      <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin-bottom:0.4rem;">
+        <input type="checkbox" id="optProtectSymbols" checked>
+        保护数字 / 单位 / 上下标 / 希腊字母 / 参考文献编号（<b>强烈建议开启</b>）
+      </label>
+      <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin-bottom:0.6rem;">
+        <input type="checkbox" id="optUseTM" checked>
+        启用翻译记忆（同一内容只翻一次，改稿重译只翻改动段落）
+      </label>
+
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+        <button class="btn btn-outline btn-sm" id="loadAcademicTerms">📚 载入学术常用术语（推荐）</button>
+        <button class="btn btn-outline btn-sm" id="importTermsFile">📥 导入术语表文件</button>
+        <button class="btn btn-outline btn-sm" id="exportTermsFile">📤 导出术语表</button>
+        <input type="file" id="termsFileInput" accept=".txt,.csv,.tsv,.md" style="display:none;">
+      </div>
+
+      <div style="font-size:0.78rem; color:#64748b; margin-bottom:0.3rem;">
+        术语表（每行一条，格式 <code>源词 = 目标译法</code>；<code>#</code> 开头为注释）
+      </div>
+      <textarea id="termsText" spellcheck="false"
+        style="width:100%; height:150px; font-family:Consolas,monospace; font-size:12px; line-height:1.5; border:1px solid var(--border); border-radius:0.6rem; padding:0.6rem;"
+        placeholder="精子DNA碎片化指数 = sperm DNA fragmentation index&#10;不育男性 = infertile men&#10;参考文献 = References"></textarea>
+
+      <div style="margin-top:0.7rem; font-size:0.8rem; color:#475569;">
+        <b>翻译记忆：</b><span id="tmStats">—</span>
+        <button class="btn btn-outline btn-sm" id="tmExport" style="margin-left:0.5rem;">导出</button>
+        <button class="btn btn-outline btn-sm" id="tmImport">导入</button>
+        <button class="btn btn-danger btn-sm" id="tmClear">清空</button>
+        <input type="file" id="tmFileInput" accept=".json" style="display:none;">
+      </div>
+
+      <div style="margin-top:0.7rem; font-size:0.75rem; color:#94a3b8; line-height:1.7;">
+        版本 <span id="appVersion">—</span> · © 2026 灵译 LingYi · 个人使用免费，商业使用需获得授权。
+      </div>
+    </div>
+
+    <div id="translateFileList"></div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+      <i class="fas fa-check-circle" style="color:#10b981;"></i> 已完成的文档
+    </div>
+    <div id="completedList"><div style="color:#94a3b8; text-align:center; padding:2rem;">暂无完成的文档</div></div>
+  </div>
+
+  <div class="footer-hint">🔐 登录后使用完整功能 · 扫码可在手机打开</div>
+</div>
+
+<!-- 二维码放大 -->
+<div class="modal" id="qrZoomModal">
+  <div class="modal-content" style="max-width:350px;">
+    <span class="close-modal" id="closeQrZoom">&times;</span>
+    <div style="text-align:center;">
+      <div id="qrLargeContainer" style="display:inline-block;"></div>
+      <h3>灵译</h3><p>扫描二维码打开应用</p>
+    </div>
+  </div>
+</div>
+
+<!-- 登录 -->
+<div class="modal" id="loginModal">
+  <div class="modal-content">
+    <span class="close-modal" id="closeLoginModal">&times;</span>
+    <h3 style="margin-bottom:1rem; text-align:center;">账号登录</h3>
+    <div class="form-group"><label>账号</label><input type="text" id="loginUsername" placeholder="输入账号"></div>
+    <div class="form-group"><label>密码</label><input type="password" id="loginPassword" placeholder="输入密码"></div>
+    <button class="btn btn-primary" id="doLoginBtn" style="width:100%;">登录</button>
+    <p style="margin-top:0.8rem; font-size:0.75rem; color:#64748b; text-align:center;">没有账号？输入账号密码后将自动注册并登录。</p>
+  </div>
+</div>
+
+<!-- 历史记录 -->
+<div class="modal" id="historyModal">
+  <div class="modal-content">
+    <span class="close-modal" id="closeHistoryModal">&times;</span>
+    <h3 style="margin-bottom:1rem;">翻译记录（近 30 天）</h3>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<div class="toast-notification" id="toast"></div>
+
+<!-- 部署配置（可选：接口地址；不含任何密钥。缺失不影响使用，界面里填即可） -->
+<!-- ==================== config.js（部署配置，可改） ==================== -->
+<script>
+/* ============================================================================
+ * 灵译 · 部署配置 (config.js)   © 2026 灵译 LingYi
+ * ----------------------------------------------------------------------------
+ * 这里只放"接口地址"这类非机密配置，**绝对不要**把密钥写进来！
+ *
+ * 正确做法（也是本项目采用的架构）：
+ *   · 腾讯云 SecretId / SecretKey、DeepSeek API Key —— 全部写在
+ *     【云函数的环境变量】里（腾讯云控制台 → 函数 → 配置 → 环境变量），
+ *     永远不出现在前端代码、这个文件或 GitHub 上。
+ *   · 前端只知道一个"云函数 URL"，它没有密钥，泄露了也只是被白用额度。
+ *
+ * 使用方式（二选一）：
+ *   1) 填在这里 —— 适合自己私有部署；上传公开仓库前建议清空。
+ *   2) 留空 —— 使用者在程序界面里自己填（推荐用于公开仓库）。
+ * ==========================================================================*/
+(function (root) {
+  'use strict';
+  root.LINGYI_CONFIG = {
+    /* 你自己的云函数 URL；留空则程序会提示使用者填写 */
+    API_URL: '',
+
+    /* 其它可选默认值（留空/注释掉即使用程序默认） */
+    // DEFAULT_TARGET: 'zh-CN',     // 默认目标语言
+    // DEFAULT_ENGINE: 'tencent',   // 'tencent' 普通翻译 | 'deepseek' AI 智能翻译
+    // DEFAULT_OUT_FMT: 'docx'      // 默认输出格式
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+
+<!-- ==================== 核心模块 ==================== -->
+<!-- ==================== core.js ==================== -->
+<script>
+/* ============================================================================
+ * 灵译 · 核心层 (core.js)
+ * ----------------------------------------------------------------------------
+ * 设计原则：翻译不重建排版，而是"在原有版式骨架上替换文字"。
+ *   1) 抽取：把原文解析成结构化中间表示 IR（段落/标题/表格/图片 + 字号/对齐/缩进）
+ *   2) 翻译：只翻译"文本片段"，用哨兵标记保护分段，绝不重排结构
+ *   3) 回填：按 IR 骨架生成 PDF/DOCX/HTML，字号、对齐、缩进、表格列数与原文件一致
+ * © 2026 灵译 LingYi · 个人使用免费，商业使用需授权（见 LICENSE）
+ * ========================================================================== */
+(function (root, factory) {
+  const mod = factory();
+  if (typeof module === 'object' && module.exports) module.exports = mod;
+  root.LingyiCore = mod;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const VERSION = '2.0.0';
+
+  /* ---------------------------------------------------------------- 文本工具 */
+
+  const CJK = /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF\u3000-\u303F]/;
+
+  function hasCJK(s) { return CJK.test(s || ''); }
+
+  /** 合并 PDF/HTML 抽取出来的碎片文本，避免中英文之间被硬塞空格 */
+  function smartJoin(parts) {
+    let out = '';
+    for (const raw of parts) {
+      const p = raw == null ? '' : String(raw);
+      if (!p) continue;
+      if (!out) { out = p; continue; }
+      const a = out[out.length - 1], b = p[0];
+      if (CJK.test(a) || CJK.test(b)) out += p;          // 中文之间不留空格
+      else if (/[\s\-–—/(]$/.test(a) || /^[\s,.;:!?%)]/.test(b)) out += p;
+      else out += ' ' + p;
+    }
+    return out;
+  }
+
+  /** 归一化空白：折叠多余空格，去掉零宽字符 */
+  function normSpace(s) {
+    return String(s == null ? '' : s)
+      .replace(/\u200b|\ufeff/g, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\u00a0/g, ' ');
+  }
+
+  /** 段落文字：把 run 数组拼成纯文本 */
+  function runsToText(runs) {
+    if (!runs) return '';
+    return runs.map(r => (typeof r === 'string' ? r : r.t || r.o || '')).join('');
+  }
+
+  function charCount(str) { return (str || '').length; }
+
+  function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  function uid(prefix) {
+    uid._n = (uid._n || 0) + 1;
+    return (prefix || 'id') + '_' + uid._n.toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+  }
+
+  /* ------------------------------------------------------- IR 构造与遍历工具 */
+
+  function newIR(meta) {
+    return {
+      version: VERSION,
+      source: (meta && meta.source) || 'unknown',
+      meta: Object.assign({
+        fileName: '', title: '', author: '', subject: '', keywords: '', creator: ''
+      }, (meta && meta.meta) || {}),
+      page: Object.assign({
+        // 默认 A4，单位 pt（与 pdfmake 一致）
+        width: 595.28, height: 841.89,
+        margin: [56.7, 56.7, 56.7, 56.7] // 与 Word 默认 2cm 一致
+      }, (meta && meta.page) || {}),
+      assets: (meta && meta.assets) || [],   // [{id, dataUrl, w, h}]
+      styles: (meta && meta.styles) || {},   // 样式表：normal / h1 / h2 / caption ...
+      blocks: (meta && meta.blocks) || []
+    };
+  }
+
+  /**
+   * 遍历 IR 中所有"可翻译文本单元"，回调 (unit, ctx)
+   * unit = { id, text, kind, ref }，ref 指向 IR 中真实节点，供回填
+   */
+  function eachTextUnit(ir, visit) {
+    const out = [];
+    function para(block, kind) {
+      if (!block.runs || !block.runs.length) return;
+      // 整个段落作为一个翻译单元，保留 run 级样式，回填时按 run 切分
+      const unit = {
+        id: uid('p'),
+        kind: kind || 'para',
+        blockId: block.id,
+        text: runsToText(block.runs),
+        runs: block.runs.map(r => ({ t: r.t, b: r.b, i: r.i, u: r.u, sup: r.sup, sub: r.sub, size: r.size, color: r.color, font: r.font }))
+      };
+      block.unitId = unit.id;
+      out.push(unit);
+      if (visit) visit(unit, { block: block, ir: ir });
+      return unit;
+    }
+
+    for (const b of ir.blocks || []) {
+      if (b.type === 'table') {
+        (b.rows || []).forEach((row, ri) => row.forEach((cell, ci) => {
+          const cellRef = { tableId: b.id, row: ri, col: ci };
+          if (cell.blocks && cell.blocks.length) {
+            cell.blocks.forEach(cb => {
+              if (cb.type === 'image') { imageUnit(cb, cellRef); return; }
+              para(cb, 'cell');
+            });
+          } else if (cell.text) {
+            const unit = { id: uid('c'), kind: 'cell', tableId: b.id, row: ri, col: ci, text: cell.text, runs: cell.runs };
+            cell.unitId = unit.id;
+            out.push(unit);
+            if (visit) visit(unit, { cell: cell, table: b, ir: ir });
+          }
+        }));
+      } else if (b.type === 'image') {
+        imageUnit(b, null);
+      } else if (b.type === 'container') {
+        // 分栏容器：递归处理其中的分栏（保持每个分栏内部的独立翻译单元）
+        for (const group of b.columns || []) {
+          for (const cb of group.blocks || []) {
+            if (cb.type === 'table') {
+              (cb.rows || []).forEach((row, ri) => row.forEach((cell, ci) => {
+                if (cell.blocks && cell.blocks.length) {
+                  cell.blocks.forEach(x => para(x, 'cell'));
+                } else if (cell.text) {
+                  const unit = { id: uid('c'), kind: 'cell', tableId: cb.id, row: ri, col: ci, text: cell.text, runs: cell.runs };
+                  cell.unitId = unit.id;
+                  out.push(unit);
+                  if (visit) visit(unit, { cell: cell, table: cb, ir: ir });
+                }
+              }));
+            } else if (cb.type === 'image') {
+              imageUnit(cb, null);
+            } else {
+              para(cb, 'para');
+            }
+          }
+        }
+      } else if (b.type === 'code') {
+        /* 代码块不翻译 */
+      } else {
+        para(b, b.type === 'heading' ? 'heading' : 'para');
+      }
+    }
+
+    function imageUnit(b, cellRef) {
+      // 图片说明文字（图 1 ...）可翻译；OCR 文本单独处理
+      if (b.caption) {
+        const unit = { id: uid('cap'), kind: 'caption', blockId: b.id, text: b.caption, runs: [{ t: b.caption }] };
+        b.captionUnitId = unit.id;
+        out.push(unit);
+        if (visit) visit(unit, { block: b, ir: ir });
+      }
+    }
+
+    return out;
+  }
+
+  /** 按 id 找到翻译单元（用于回填） */
+  function applyTranslation(ir, unit, translated) {
+    const text = translated == null ? unit.text : translated;
+    if (unit.kind === 'cell') {
+      for (const b of ir.blocks) {
+        if (b.type !== 'table' || b.id !== unit.tableId) continue;
+        const cell = b.rows[unit.row][unit.col];
+        cell.o = cell.text;
+        cell.text = text;
+        cell.translated = true;
+        return true;
+      }
+      return false;
+    }
+    if (unit.kind === 'caption') {
+      const b = findBlock(ir, unit.blockId);
+      if (!b) return false;
+      b.captionO = b.caption; b.caption = text; b.captionTranslated = true;
+      return true;
+    }
+    const b = findBlock(ir, unit.blockId);
+    if (!b) return false;
+    b.o = runsToText(b.runs);
+    b.runs = redistributeRuns(b.runs, text);
+    b.translated = true;
+    return true;
+  }
+
+  function findBlock(ir, id) {
+    for (const b of ir.blocks) {
+      if (b.id === id) return b;
+      if (b.type === 'container') {
+        for (const g of b.columns || []) for (const cb of g.blocks || []) {
+          if (cb.id === id) return cb;
+          if (cb.type === 'table' && cb.rows) {
+            for (const row of cb.rows) for (const cell of row) {
+              if (cell.blocks) for (const x of cell.blocks) if (x.id === id) return x;
+            }
+          }
+        }
+        continue;
+      }
+      if (b.type === 'table' && b.rows) {
+        for (const row of b.rows) for (const cell of row) {
+          if (cell.blocks) for (const cb of cell.blocks) if (cb.id === id) return cb;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 把翻译后的整段文字重新分配到原有 run 上，保持粗体/斜体/上下标等行内样式。
+   * 策略：按原 run 字符长度比例切分译文；只有一个 run 时直接整体替换。
+   * 对"标签+内容"型段落（如【摘要】xxx）尽量让标签样式不变。
+   */
+  function redistributeRuns(runs, newText) {
+    if (!runs || !runs.length) return [{ t: newText || '' }];
+    if (runs.length === 1) return [Object.assign({}, runs[0], { t: newText || '' })];
+
+    const weights = runs.map(r => Math.max(1, (r.t || '').replace(/\s/g, '').length));
+    const total = weights.reduce((a, b) => a + b, 0);
+    const text = newText || '';
+    const out = [];
+    let pos = 0;
+    for (let i = 0; i < runs.length; i++) {
+      let take;
+      if (i === runs.length - 1) take = text.length - pos;
+      else take = Math.round(text.length * weights[i] / total);
+      take = Math.max(0, Math.min(take, text.length - pos));
+      out.push(Object.assign({}, runs[i], { t: text.substr(pos, take) }));
+      pos += take;
+    }
+    if (pos < text.length) out[out.length - 1].t += text.slice(pos);
+    return out;
+  }
+
+  /* --------------------------------------------------------- 翻译分段与批处理 */
+
+  const SEG_OPEN = '\u27e6';   // ⟦
+  const SEG_CLOSE = '\u27e7';  // ⟧
+
+  function segToken(n) { return SEG_OPEN + n + SEG_CLOSE; }
+
+  /**
+   * 把翻译单元分组成批次。每批大小受 maxChars 限制。
+   * 每个片段用哨兵标记包裹，保证结构在翻译后仍可还原。
+   */
+  function buildBatches(units, maxChars) {
+    maxChars = maxChars || 2800;
+    const batches = [];
+    let cur = { items: [], size: 0, text: '' };
+    for (const u of units) {
+      const piece = segToken(batches.length + cur.items.length) + '\n' + u.text + '\n' + segToken(batches.length + cur.items.length) + '\n';
+      // 单个超长片段：独占一批并做切分
+      if (u.text.length > maxChars) {
+        if (cur.items.length) { batches.push(cur); cur = { items: [], size: 0, text: '' }; }
+        batches.push({ items: [u], size: u.text.length, text: segToken(0) + '\n' + u.text + '\n' + segToken(0) + '\n', oversized: true, baseIndex: 0 });
+        continue;
+      }
+      if (cur.size + piece.length > maxChars && cur.items.length) {
+        batches.push(cur);
+        cur = { items: [], size: 0, text: '' };
+      }
+      const idx = cur.items.length;
+      cur.items.push(u);
+      cur.size += piece.length;
+      cur.text += segToken(idx) + '\n' + u.text + '\n' + segToken(idx) + '\n';
+      u._batchIndex = idx;
+    }
+    if (cur.items.length) batches.push(cur);
+    return batches;
+  }
+
+  /** 从译文里解析出各片段（容忍标记变形/丢失） */
+  function parseSegments(translated, count) {
+    const res = new Array(count).fill(null);
+    if (!translated) return res;
+
+    // 1) 标准标记
+    const tokens = [];
+    const re = new RegExp(SEG_OPEN + '\\s*(\\d+)\\s*' + SEG_CLOSE, 'g');
+    let m;
+    while ((m = re.exec(translated)) !== null) tokens.push({ n: parseInt(m[1], 10), start: m.index, end: re.lastIndex });
+    // 2) 退化标记（模型把 ⟦⟧ 换成别的括号，或加了空格）
+    if (tokens.length < count) {
+      const re2 = /[\[【(（]\s*(\d{1,3})\s*[\]】)）]/g;
+      let m2, cand = [];
+      while ((m2 = re2.exec(translated)) !== null) cand.push({ n: parseInt(m2[1], 10), start: m2.index, end: re2.lastIndex });
+      // 只接受形如 0,1,2... 递增且数量足够的候选，避免把正文里的 [1] 之类误当标记
+      const seq = []; let expect = 0;
+      for (const c of cand) { if (c.n === expect) { seq.push(c); expect++; } }
+      if (seq.length >= 2 && seq.length >= count - 1) return sliceTokens(translated, seq, count);
+    }
+    return sliceTokens(translated, tokens, count);
+  }
+
+  function sliceTokens(translated, tokens, count) {
+    const res = new Array(count).fill(null);
+    if (!tokens.length) return res;
+    // 可能同一编号出现两次（开/闭标记），取"第一个"作为起点
+    const firstSeen = new Map();
+    for (const tk of tokens) if (!firstSeen.has(tk.n)) firstSeen.set(tk.n, tk);
+    const ordered = [...firstSeen.values()].sort((a, b) => a.start - b.start);
+    for (let i = 0; i < ordered.length; i++) {
+      const start = ordered[i].end;
+      const end = i + 1 < ordered.length ? ordered[i + 1].start : translated.length;
+      const body = translated.slice(start, end).replace(new RegExp(SEG_OPEN + '\\s*\\d+\\s*' + SEG_CLOSE, 'g'), '').trim();
+      if (ordered[i].n < count) res[ordered[i].n] = body;
+    }
+    return res;
+  }
+
+  /* ---------------------------------------------------------------- 通用工具 */
+
+  /** 用于给后端提示的保护规则（翻译时不要动这些东西） */
+  const PROTECT_RULES = [
+    '保留所有 ⟦数字⟧ 形式的标记，数量、顺序必须与原文完全一致，不能增删、不能翻译标记本身。',
+    '保留数字、单位、公式、参考文献编号（如 [1,2]）、图表编号（图1/表2）原样。',
+    '保持每个片段与原文一一对应，不要合并或拆分片段，不要输出多余的解释。',
+    '保留原文中的换行结构。'
+  ];
+
+  function splitParagraphs(text) {
+    return String(text || '').replace(/\r\n?/g, '\n').split(/\n{2,}/);
+  }
+
+  function isProbablyHeading(line) {
+    const s = (line || '').trim();
+    if (!s || s.length > 60) return false;
+    if (/^\d+(\.\d+)*[\s、.]/.test(s)) return true;
+    if (/^(第[一二三四五六七八九十]+[章节部分]|摘\s*要|Abstract|关键词|参考文献|References|引\s*言|结\s*论|讨论|材料与方法)/i.test(s)) return true;
+    if (/^#{1,6}\s/.test(s)) return true;
+    return false;
+  }
+
+  /* ------------------------------------------------------- 标题层级统一判定 */
+
+  /**
+   * 判定一个段落块是不是标题，并给出层级 1..4（0 = 不是标题）。
+   * 中英文论文的常见形态：编号式（1 / 1.1 / 一、）、关键词式（摘要/引言/参考文献）、
+   * 字号放大式、加粗式。
+   * @param {Object} b 段落块 {type,runs,size,bold,align}
+   * @param {Object} env {bodySize, sizes:降序字号数组, firstBlocks:是否文档开头}
+   */
+  function classifyHeading(b, env) {
+    env = env || {};
+    const body = env.bodySize || 10.5;
+    const sizes = env.sizes || [];
+    const text = runsToText(b.runs || []).trim();
+    if (!text || text.length > 90) return 0;
+    if (/[。；;]$/.test(text)) return 0;
+    if (/^[\[（(]?(图|表|Fig|Table)/i.test(text)) return 0;      // 图表题另处理
+
+    const size = b.size || body;
+    const boldLike = !!b.bold;
+    const centered = (b.align || '') === 'center';
+    const numMatch = /^(\d+(?:\.\d+)*)\s*[、.．]?\s+\S/.exec(text) || /^(\d+(?:\.\d+)*)[、.．]\s*\S/.exec(text);
+    const cnNum = /^[一二三四五六七八九十]+[、.．]\s*\S/.test(text);
+    const keyword = /^(摘\s*要|Abstract|摘　要|关键词|Key\s*words?|引\s*言|前\s*言|结\s*论|讨\s*论|参考文献|References|致\s*谢|材料与方法|对象与方法|统计学方法|资料与方法|结果|方法)/i.test(text);
+    const afterNum = numMatch ? text.slice(numMatch[0].length) : text.replace(/^[一二三四五六七八九十]+[、.．]\s*/, '');
+    const looksLikeHeadingTail = afterNum.length <= 28;
+    const cnHeading = cnNum && afterNum.length <= 28;
+
+    let level = 0;
+    if (size > body + 1.5) level = Math.max(1, sizes.indexOf(size) + 1);
+    if (boldLike && text.length <= 60 &&
+        ((numMatch && looksLikeHeadingTail) || cnHeading || keyword || size >= body + 0.4)) {
+      const byNum = numMatch ? Math.min(4, numMatch[1].split('.').length) : (cnHeading ? 1 : 2);
+      level = Math.max(level, numMatch || cnHeading ? byNum : 2);
+    }
+    if (/[。；;]/.test(text) && text.length > 30) level = 0;      // 长句不是标题
+    if (/(参考文献|References)/i.test(text) && text.length < 24) level = 1;
+    else if (/(结\s*论|讨\s*论|致\s*谢)/i.test(text) && text.length < 24 && level > 2) level = 2;
+    return Math.min(4, Math.max(0, level));
+  }
+
+  /** 把 IR 里的段落块批量标记为 heading（就地修改，含分栏容器内部） */
+  function applyHeadingLevels(ir, opts) {
+    opts = opts || {};
+    const all = [];
+    (function walk(bs) {
+      for (const b of bs) {
+        if (b.type === 'container') { (b.columns || []).forEach(g => walk(g.blocks || [])); continue; }
+        all.push(b);
+      }
+    })(ir.blocks || []);
+    const body = ir.bodySize || 10.5;
+    const sizes = (ir.fontSizes && ir.fontSizes.length ? ir.fontSizes : [...new Set(
+      all.filter(b => b.type === 'paragraph' && b.size).map(b => b.size)
+    )]).slice().sort((a, b) => b - a);
+    const maxSize = sizes.length ? sizes[0] : body;
+    let firstSeen = false;
+    let seenBlocks = 0;
+    const isBoldBlock = b => !!b.bold || (b.runs || []).some(r => r.b);
+    for (const b of all) {
+      if (b.type !== 'paragraph') { seenBlocks++; continue; }
+      const level = classifyHeading(b, { bodySize: body, sizes: sizes });
+      if (level > 0) {
+        b.type = 'heading';
+        b.level = level;
+        const text = runsToText(b.runs);
+        // 文档最开头、字号最大、居中加粗 → 主标题
+        if (!firstSeen && b.align === 'center' && isBoldBlock(b) && (b.size || body) >= maxSize - 0.2 &&
+            text.length > 3 && text.length <= 90 && seenBlocks < 3) {
+          b.level = 1;
+          firstSeen = true;
+        }
+      }
+      seenBlocks++;
+    }
+    return ir;
+  }
+
+  return {
+    VERSION, CJK, hasCJK, smartJoin, normSpace, runsToText, charCount, deepClone, uid,
+    newIR, eachTextUnit, applyTranslation, redistributeRuns, findBlock,
+    SEG_OPEN, SEG_CLOSE, segToken, buildBatches, parseSegments, PROTECT_RULES,
+    splitParagraphs, isProbablyHeading, classifyHeading, applyHeadingLevels
+  };
+});
+
+</script>
+<!-- ==================== layout.js ==================== -->
+<script>
+/* ============================================================================
+ * 灵译 · 版面几何工具 (layout.js)
+ * ----------------------------------------------------------------------------
+ * 供 PDF 结构抽取使用：行聚类、空白割缝分析、区域树（阅读顺序）、表格栅格识别。
+ * 纯数学工具，无外部依赖，可在 Node 与浏览器中运行。
+ * © 2026 灵译 LingYi · 个人使用免费，商业使用需授权（见 LICENSE）
+ * ========================================================================== */
+(function (root, factory) {
+  const mod = factory();
+  if (typeof module === 'object' && module.exports) module.exports = mod;
+  root.LingyiLayout = mod;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const EPS = 0.4;
+
+  /* ------------------------------------------------------------------ 基础 */
+
+  function width(it) { return it.x1 - it.x0; }
+  function height(it) { return it.y1 - it.y0; }
+  function centerY(it) { return (it.y0 + it.y1) / 2; }
+  function centerX(it) { return (it.x0 + it.x1) / 2; }
+
+  function unionBox(items) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const it of items) {
+      if (it.x0 < x0) x0 = it.x0;
+      if (it.y0 < y0) y0 = it.y0;
+      if (it.x1 > x1) x1 = it.x1;
+      if (it.y1 > y1) y1 = it.y1;
+    }
+    return { x0, y0, x1, y1 };
+  }
+
+  /** 两个区间重叠长度 */
+  function overlap1d(a0, a1, b0, b1) {
+    return Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+  }
+
+  /**
+   * 一行有多少字"横跨" [gx0, gx1] 这个竖直切口
+   * 重叠超过行高 60% 才认为真的跨栏（避免标点/边界误差）
+   */
+  function crossingCount(items, gx0, gx1) {
+    let n = 0;
+    for (const it of items) {
+      const ov = overlap1d(it.x0, it.x1, gx0, gx1);
+      if (ov > 0 && ov > Math.min(width(it), (gx1 - gx0)) * 0.6) n++;
+      else if (ov > 0 && it.x0 < gx0 && it.x1 > gx1) n++;
+    }
+    return n;
+  }
+
+  /* -------------------------------------------------------------- 1. 行聚类 */
+
+  /**
+   * 把文本片段按基线聚成行
+   * @returns {Array<{items:Array,y0,y1,cy,size,x0,x1}>}
+   */
+  function groupLines(items) {
+    const sorted = items.slice().sort((a, b) => (a.y0 - b.y0) || (a.x0 - b.x0));
+    const lines = [];
+    let cur = [];
+    let curKey = null;                    // 当前行参考的中心线
+    let curSize = 0;
+    for (const it of sorted) {
+      const h = Math.max(0.5, height(it));
+      const sz = it.size || h;
+      if (!cur.length) { cur = [it]; curKey = it.y0 + h * 0.72; curSize = sz; continue; }
+      const ref = curKey;
+      const tol = Math.max(1.6, Math.min(curSize, sz) * 0.45, h * 0.35);
+      const key = it.y0 + h * 0.72;
+      if (Math.abs(key - ref) <= tol) {
+        cur.push(it);
+        curSize = Math.max(curSize, sz);
+        // 用高度加权平均更新基线，长片段权重更大
+        const wsum = cur.reduce((a, x) => a + Math.max(1, width(x)), 0);
+        curKey = cur.reduce((a, x) => a + (x.y0 + Math.max(0.5, height(x)) * 0.72) * Math.max(1, width(x)), 0) / wsum;
+      } else {
+        lines.push(finishLine(cur, curSize));
+        cur = [it]; curKey = key; curSize = sz;
+      }
+    }
+    if (cur.length) lines.push(finishLine(cur, curSize));
+    lines.sort((a, b) => a.y0 - b.y0);
+    return lines;
+  }
+
+  function finishLine(items, size) {
+    const s = items.slice().sort((a, b) => a.x0 - b.x0);
+    const box = unionBox(s);
+    const sz = s.map(x => x.size || height(x)).sort((a, b) => b - a)[Math.floor(s.length / 3)] || size;
+    const gap = lineMaxGap(s);
+    return {
+      items: s, y0: box.y0, y1: box.y1, cy: (box.y0 + box.y1) / 2,
+      x0: box.x0, x1: box.x1, size: sz, gaps: gap
+    };
+  }
+
+  /** 行内最大空白间隔（用于表格/多栏识别） */
+  function lineMaxGap(items, minGap) {
+    minGap = minGap == null ? 2 : minGap;
+    let maxGap = 0, at = null;
+    for (let i = 1; i < items.length; i++) {
+      const g = items[i].x0 - items[i - 1].x1;
+      if (g > maxGap) { maxGap = g; at = items[i - 1].x1; }
+    }
+    return { size: maxGap >= minGap ? maxGap : 0, at: at };
+  }
+
+  /** 行内所有 >= minGap 的空白段（用于切分单元格） */
+  function lineGaps(items, minGap) {
+    const gaps = [];
+    for (let i = 1; i < items.length; i++) {
+      const g = items[i].x0 - items[i - 1].x1;
+      if (g >= (minGap == null ? 3 : minGap)) gaps.push({ from: items[i - 1].x1, to: items[i].x0, size: g, index: i });
+    }
+    return gaps;
+  }
+
+  /* -------------------------------------------------------- 2. 竖直切口检测 */
+
+  /**
+   * 找出竖直空白走廊（候选分栏中缝）。
+   * 做法：把"有文字覆盖的 x 区间"合并，区间之间的空隙就是走廊。
+   * 判据：走廊两侧都要有足够内容；被通栏标题挡住的部分按覆盖率折算权重。
+   * @returns {Array<{x0,x1,width,coverage,score,mid,leftCount,rightCount}>}
+   */
+  function findVerticalGutters(items, opts) {
+    opts = opts || {};
+    const minGap = opts.minGap || 8;
+    const minItems = opts.minItems || 2;
+    if (!items.length) return [];
+
+    // 1) 合并覆盖区间（合并后必须按 x 排序，否则空隙会算错）
+    const sorted = items.slice().sort((a, b) => a.x0 - b.x0);
+    const segs = [];
+    for (const it of sorted) {
+      const last = segs[segs.length - 1];
+      if (last && it.x0 <= last.x1 + 0.01) { if (it.x1 > last.x1) last.x1 = it.x1; }
+      else segs.push({ x0: it.x0, x1: it.x1 });
+    }
+    segs.sort((a, b) => a.x0 - b.x0);
+
+    let yTop = Infinity, yBot = -Infinity, wsum = 0;
+    for (const it of items) {
+      if (it.y0 < yTop) yTop = it.y0;
+      if (it.y1 > yBot) yBot = it.y1;
+      wsum += (it.x1 - it.x0);
+    }
+    const totalH = Math.max(1, yBot - yTop);
+    const lineH = Math.max(4, (wsum / items.length) * 0.14);
+
+    // 2) 相邻覆盖区间之间就是候选走廊
+    const candidates = [];
+    for (let i = 0; i < segs.length - 1; i++) {
+      const a = segs[i].x1, b = segs[i + 1].x0;
+      if (b - a >= minGap) candidates.push({ x0: a, x1: b, width: b - a });
+    }
+    if (!candidates.length) return [];
+    // 只评估最宽的若干个，避免在正文里挑出无意义的细小空隙
+    candidates.sort((p, q) => q.width - p.width);
+    const top = candidates.slice(0, 16);
+
+    const out = [];
+    for (const c of top) {
+      const mid = (c.x0 + c.x1) / 2;
+      const left = items.filter(it => it.x1 <= c.x0 + 0.5);
+      const right = items.filter(it => it.x0 >= c.x1 - 0.5);
+      if (left.length < minItems || right.length < minItems) continue;
+      // 走廊之外的片段必须是"完整落在某一侧"，否则说明还有内容穿插
+      if (left.length + right.length !== items.length) continue;
+      // 覆盖率：不落在任何一侧、却横跨走廊中央的通栏内容会降低覆盖率
+      let blockedH = 0;
+      for (const it of items) {
+        if (it.x0 < mid && it.x1 > mid) blockedH += Math.max(lineH, it.y1 - it.y0);
+      }
+      const coverage = Math.max(0, 1 - blockedH / totalH);
+      const balance = Math.min(left.length, right.length) / Math.max(left.length, right.length);
+      out.push({
+        x0: c.x0, x1: c.x1, width: c.width, mid: mid,
+        coverage: coverage, balance: balance,
+        score: coverage * 4 + balance * 2 + Math.min(1, c.width / 60),
+        leftCount: left.length, rightCount: right.length
+      });
+    }
+    out.sort((p, q) => q.score - p.score);
+    return out;
+  }
+
+  /* ------------------------------------------------------ 3. 区域树（阅读顺序） */
+
+  /**
+   * 分析一页的阅读顺序（支持"通栏标题 + 双栏正文"）：
+   *   1) 先用中缝把内容切成 [栏带] 与 [通栏块]（允许少量通栏内容横跨中缝）
+   *   2) 栏带内按 左栏 → 右栏 阅读
+   *   3) 通栏块按它在页面上的纵向位置插回正确位置
+   * @returns {Array<{lines, box, spanning, depth}>} 按阅读顺序排列的区域
+   */
+  function analyzePage(items, opts) {
+    opts = opts || {};
+    if (!items.length) return [];
+    const initialLines = groupLines(items);
+    if (initialLines.length < 6) return [mkLineRegion(initialLines, 0)];
+
+    // 在"片段级"找竖直走廊：分栏排版里，中缝上横跨的片段极少（通常只有通栏标题/公式）。
+    const corridor = findColumnCorridor(items, opts);
+    if (!corridor) return [mkLineRegion(initialLines, 0)];
+
+    // 按走廊把片段分成 左 / 右 / 通栏
+    const leftItems = [], rightItems = [], spanItems = [];
+    for (const it of items) {
+      const c = (it.x0 + it.x1) / 2;
+      const leftPart = Math.max(0, Math.min(it.x1, corridor.x1) - Math.max(it.x0, corridor.x0));
+      const w = Math.max(1, it.x1 - it.x0);
+      if (leftPart / w > 0.25 && leftPart / w < 0.75) { spanItems.push(it); continue; }  // 明确横跨中缝
+      if (c < corridor.x0) leftItems.push(it);
+      else if (c > corridor.x1) rightItems.push(it);
+      else spanItems.push(it);
+    }
+    const leftLines = groupLines(leftItems);
+    const rightLines = groupLines(rightItems);
+    if (leftLines.length < 3 || rightLines.length < 3) return [mkLineRegion(initialLines, 0)];
+    const ratio = Math.min(leftLines.length, rightLines.length) / Math.max(leftLines.length, rightLines.length);
+    if (ratio < 0.2) return [mkLineRegion(initialLines, 0)];
+
+    // 通栏片段单独成行（按基线聚合）
+    const spanLines = groupLines(spanItems);
+    const box = unionBox(items);
+    const colW = Math.max(
+      Math.max.apply(null, leftItems.map(i => i.x1).concat([0])) - Math.min.apply(null, leftItems.map(i => i.x0).concat([Infinity])),
+      Math.max.apply(null, rightItems.map(i => i.x1).concat([0])) - Math.min.apply(null, rightItems.map(i => i.x0).concat([Infinity]))
+    );
+    const out = [];
+    const topLimit = box.y0 + (box.y1 - box.y0) * 0.06 + 6;
+    const topSpans = spanLines.filter(l => l.y0 <= topLimit).sort((a, b) => a.y0 - b.y0);
+    const midSpans = spanLines.filter(l => l.y0 > topLimit).sort((a, b) => a.y0 - b.y0);
+    for (const l of topSpans) out.push(mkLineRegion([l], 0, true));
+
+    const splitAt = midSpans.length ? midSpans[0].y0 : Infinity;
+    for (const colLines of [leftLines, rightLines]) {
+      let cur = [];
+      for (const l of colLines) {
+        if (l.y0 >= splitAt && cur.length) { out.push(mkLineRegion(cur, 0)); cur = []; }
+        cur.push(l);
+      }
+      if (cur.length) out.push(mkLineRegion(cur, 0));
+    }
+    for (const l of midSpans) out.push(mkLineRegion([l], 0, true));
+    return out.length ? out : [mkLineRegion(initialLines, 0)];
+  }
+
+  /**
+   * 找"分栏走廊"：一条竖直带，横跨它的片段数量最少。
+   * 用覆盖率（走廊在纵向上的空白比例）与两侧平衡度打分。
+   */
+  function findColumnCorridor(items, opts) {
+    opts = opts || {};
+    if (items.length < 12) return null;
+    // 候选：所有片段的左/右边界之间的空隙
+    const pts = new Set();
+    for (const it of items) { pts.add(it.x0); pts.add(it.x1); }
+    const xs = [...pts].sort((a, b) => a - b);
+    const minGap = opts.minGap || 12;
+
+    let yTop = Infinity, yBot = -Infinity, wsum = 0;
+    for (const it of items) {
+      if (it.y0 < yTop) yTop = it.y0;
+      if (it.y1 > yBot) yBot = it.y1;
+      wsum += (it.x1 - it.x0);
+    }
+    const totalH = Math.max(1, yBot - yTop);
+    const lineH = Math.max(4, (wsum / items.length) * 0.14);
+
+    let best = null;
+    // 依次放宽条件：先找"标准双栏"，找不到再找"一栏内容较少"的排版
+    const passes = [
+      { minCov: 0.55, minBal: 0.2 },
+      { minCov: 0.42, minBal: 0.1 }
+    ];
+    for (const pass of passes) {
+      for (let i = 0; i < xs.length - 1; i++) {
+        const a = xs[i], b = xs[i + 1];
+        if (b - a < minGap) continue;
+        const mid = (a + b) / 2;
+        let crossH = 0, crossN = 0, leftN = 0, rightN = 0;
+        for (const it of items) {
+          const c = (it.x0 + it.x1) / 2;
+          if (it.x0 < mid && it.x1 > mid) { crossN++; crossH += Math.max(lineH, it.y1 - it.y0); }
+          else if (c < mid) leftN++;
+          else rightN++;
+        }
+        if (leftN < 4 || rightN < 4) continue;
+        const coverage = Math.max(0, 1 - crossH / totalH);
+        if (coverage < pass.minCov) continue;
+        const balance = Math.min(leftN, rightN) / Math.max(leftN, rightN);
+        if (balance < pass.minBal) continue;
+        const score = coverage * 3 + balance * 1.5 - Math.min(1, crossN / 6);
+        if (!best || score > best.score) {
+          best = { x0: a, x1: b, mid: mid, coverage: coverage, balance: balance, crossN: crossN, score: score };
+        }
+      }
+      if (best) break;
+    }
+    return best;
+  }
+
+  function analyzeLines(lines, depth, opts) {
+    return analyzePage(lines.reduce((a, l) => a.concat(l.items), []), opts);
+  }
+
+  function mkLineRegion(lines, depth, spanning) {
+    const items = lines.reduce((a, l) => a.concat(l.items), []);
+    const box = items.length ? unionBox(items) : { x0: 0, y0: 0, x1: 0, y1: 0 };
+    return {
+      lines: lines, items: items, box: box, depth: depth || 0,
+      spanning: !!spanning, columnCount: 1,
+      width: box.x1 - box.x0, height: box.y1 - box.y0
+    };
+  }
+
+  /**
+   * 兼容旧接口：区域内递归切分（保留给外部调用）
+   */
+  function regionize(items, depth, maxDepth) {
+    return analyzePage(items, {});
+  }
+
+  /**
+   * 通栏块与栏内块的顺序修正（analyzePage 已处理，保留给兼容调用）
+   */
+  function orderRegionsByFlow(regions) {
+    return regions;
+  }
+
+  /* ------------------------------------------------------------ 4. 表格栅格 */
+
+  /**
+   * 判断一组行是否构成表格，若构成则生成 rows
+   * 条件：≥2 行，每行 ≥2 个"列块"，且各行的列块左边界在容差内对齐
+   */
+  function detectTable(lines, opts) {
+    opts = opts || {};
+    const minCols = opts.minCols || 2;
+    const minRows = opts.minRows || 2;
+    if (lines.length < minRows) return null;
+
+    // 每行按大空白切分成"列块"
+    const rowsCells = [];
+    for (const line of lines) {
+      const gaps = lineGaps(line.items, Math.max(6, (line.size || 10) * 0.9));
+      if (!gaps.length) return null;
+      const cells = [];
+      let start = 0;
+      for (const g of gaps) {
+        cells.push(line.items.slice(start, g.index));
+        start = g.index;
+      }
+      cells.push(line.items.slice(start));
+      if (cells.length < minCols) return null;
+      rowsCells.push(cells);
+    }
+
+    // 表格特征：大多数行都是多列，且每格文字较短（正文的"大空白"不是这样）
+    const multiCount = rowsCells.filter(c => c.length >= minCols).length;
+    if (multiCount < Math.ceil(rowsCells.length * 0.75)) return null;
+    let totalCells = 0, longCells = 0;
+    for (const cells of rowsCells) {
+      for (const c of cells) {
+        totalCells++;
+        if (c.map(x => x.str).join('').trim().length > 22) longCells++;
+      }
+    }
+    if (totalCells && longCells / totalCells > 0.35) return null;
+
+    // 列边界聚类：用所有单元格的左边界
+    const lefts = [];
+    for (const cells of rowsCells) for (const c of cells) lefts.push(c[0].x0);
+    lefts.sort((a, b) => a - b);
+    const clusters = [];
+    for (const x of lefts) {
+      const last = clusters[clusters.length - 1];
+      if (last && Math.abs(last.mean - x) <= Math.max(4, (opts.tol || 6))) {
+        last.vals.push(x); last.mean = last.vals.reduce((a, b) => a + b, 0) / last.vals.length;
+      } else clusters.push({ mean: x, vals: [x] });
+    }
+    const colCount = clusters.length;
+    if (colCount < minCols) return null;
+    // 列数必须 ≥ 每行平均列块数
+    const avgCells = rowsCells.reduce((a, c) => a + c.length, 0) / rowsCells.length;
+    if (avgCells < minCols) return null;
+
+    // 真实表格的每行列块数应当稳定；正文行被大空白切开时列数会剧烈变化
+    const counts = rowsCells.map(c => c.length);
+    const cMin = Math.min(...counts), cMax = Math.max(...counts);
+    if (cMax - cMin > 2) return null;
+    const multiRows = counts.filter(c => c >= minCols).length;
+    if (multiRows < Math.max(minRows, Math.ceil(rowsCells.length * 0.75))) return null;
+
+    // 按列中心分配单元格
+    const grid = [];
+    let avgAligned = 0;
+    for (const cells of rowsCells) {
+      const row = new Array(colCount).fill(null);
+      let aligned = 0;
+      for (const c of cells) {
+        const cx = c[0].x0;
+        let bi = 0, bd = Infinity;
+        clusters.forEach((cl, i) => { const d = Math.abs(cl.mean - cx); if (d < bd) { bd = d; bi = i; } });
+        if (bd <= Math.max(6, (opts.tol || 6))) aligned++;
+        if (!row[bi]) row[bi] = c; else row[bi] = row[bi].concat(c);
+      }
+      avgAligned += aligned / cells.length;
+      grid.push(row.map(c => c ? { items: c } : null));
+    }
+    avgAligned /= rowsCells.length;
+    if (avgAligned < 0.8) return null;
+    // 网格不应大面积空缺（否则是把正文误判为表格）
+    let empty = 0;
+    for (const row of grid) for (let i = 0; i < colCount; i++) if (!row[i]) empty++;
+    const fillRatio = 1 - empty / (grid.length * colCount);
+    if (fillRatio < 0.6) return null;
+
+    return { colCount, grid, rowCount: rowsCells.length, quality: avgAligned, fillRatio };
+  }
+
+  /* ---------------------------------------------------------------- 导出 */
+
+  return {
+    EPS, width, height, centerX, centerY, unionBox, overlap1d, crossingCount,
+    groupLines, lineMaxGap, lineGaps, findVerticalGutters, findColumnCorridor,
+    analyzePage, analyzeLines, mkLineRegion, regionize, orderRegionsByFlow,
+    detectTable
+  };
+});
+
+</script>
+<!-- ==================== docx-extract.js ==================== -->
+<script>
+/* ============================================================================
+ * 灵译 · DOCX / DOC / HTML 结构抽取 (docx-extract.js)
+ * ----------------------------------------------------------------------------
+ * 不把 Word 压成纯文本！而是解析成带层级、对齐、字号、缩进、表格、图片的 IR。
+ * 依赖 mammoth 把 docx 转成语义化 HTML，再用本文件内置的轻量 DOM 解析成 IR。
+ * 同时支持直接把 .html/.htm 文件解析成同一套 IR。
+ * © 2026 灵译 LingYi · 个人使用免费，商业使用需授权（见 LICENSE）
+ * ========================================================================== */
+(function (root, factory) {
+  const core = (typeof module === 'object' && module.exports) ? require('./core.js') : root.LingyiCore;
+  const mod = factory(core);
+  if (typeof module === 'object' && module.exports) module.exports = mod;
+  root.LingyiDocx = mod;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (core) {
+  'use strict';
+
+  /* ======================================================================
+   * 一、轻量 HTML 解析器（容错、无依赖）
+   * ====================================================================*/
+
+  const VOID_TAGS = new Set(['br', 'hr', 'img', 'input', 'meta', 'link', 'col', 'source', 'wbr', 'area', 'base']);
+
+  function decodeEntities(s) {
+    if (!s || s.indexOf('&') < 0) return s;
+    return s.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (m, e) => {
+      if (e[0] === '#') {
+        const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        try { return String.fromCodePoint(code); } catch (_) { return m; }
+      }
+      const named = {
+        amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0',
+        ldquo: '\u201c', rdquo: '\u201d', lsquo: '\u2018', rsquo: '\u2019',
+        mdash: '\u2014', ndash: '\u2013', hellip: '\u2026', times: '\u00d7',
+        middot: '\u00b7', deg: '\u00b0', plusmn: '\u00b1', le: '\u2264', ge: '\u2265',
+        alpha: '\u03b1', beta: '\u03b2', gamma: '\u03b3', mu: '\u03bc', Delta: '\u0394'
+      };
+      return named[e] !== undefined ? named[e] : m;
+    });
+  }
+
+  function parseAttrs(str) {
+    const attrs = {};
+    const re = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*("([^"]*)"|'([^']*)'|([^\s"'>]+))|([a-zA-Z_:][-a-zA-Z0-9_:.]*)/g;
+    let m;
+    while ((m = re.exec(str)) !== null) {
+      if (m[1]) attrs[m[1].toLowerCase()] = decodeEntities(m[3] !== undefined ? m[3] : (m[4] !== undefined ? m[4] : m[5]));
+      else if (m[6]) attrs[m[6].toLowerCase()] = '';
+    }
+    return attrs;
+  }
+
+  function parseHTML(html) {
+    const rootNode = { tag: '#root', attrs: {}, children: [], parent: null };
+    const stack = [rootNode];
+    const top = () => stack[stack.length - 1];
+    const re = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<!DOCTYPE[^>]*>|<\/([a-zA-Z][a-zA-Z0-9:-]*)\s*>|<([a-zA-Z][a-zA-Z0-9:-]*)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>|([^<]+)/g;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      if (m[1]) {                                   // 结束标签
+        const name = m[1].toLowerCase();
+        for (let i = stack.length - 1; i > 0; i--) {
+          if (stack[i].tag === name) { stack.length = i; break; }
+        }
+      } else if (m[2]) {                            // 开始标签
+        const name = m[2].toLowerCase();
+        const node = { tag: name, attrs: parseAttrs(m[3] || ''), children: [], parent: top() };
+        top().children.push(node);
+        if (!VOID_TAGS.has(name) && m[4] !== '/') stack.push(node);
+      } else if (m[5] !== undefined) {               // 文本
+        const t = decodeEntities(m[5]);
+        if (t) top().children.push({ tag: '#text', text: t, parent: top() });
+      }
+    }
+    return rootNode;
+  }
+
+  /* ======================================================================
+   * 二、HTML → IR
+   * ====================================================================*/
+
+  const BLOCK_TAGS = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li',
+    'blockquote', 'pre', 'table', 'tr', 'td', 'th', 'ul', 'ol', 'hr', 'section',
+    'article', 'header', 'footer', 'figure', 'figcaption', 'tbody', 'thead', 'center']);
+
+  const STYLE_FALLBACK = {
+    heading1: { size: 15, bold: true, after: 6 },
+    heading2: { size: 12, bold: true, after: 4 },
+    heading3: { size: 10.5, bold: true, after: 3 },
+    heading4: { size: 10.5, bold: true, after: 3 },
+    body: { size: 10.5 },
+    caption: { size: 9, italic: false }
+  };
+
+  function parseSize(v) {
+    if (!v) return null;
+    const m = /([\d.]+)\s*(pt|px|em|rem|%)?/i.exec(String(v));
+    if (!m) return null;
+    let n = parseFloat(m[1]);
+    const unit = (m[2] || 'pt').toLowerCase();
+    if (unit === 'px') n = n * 0.75;
+    else if (unit === 'em' || unit === 'rem') n = n * 12;
+    else if (unit === '%') n = n * 0.12;
+    return n > 0 && n < 200 ? Math.round(n * 10) / 10 : null;
+  }
+
+  function parseStyleAttr(s) {
+    const o = {};
+    String(s || '').split(';').forEach(part => {
+      const i = part.indexOf(':');
+      if (i < 0) return;
+      const k = part.slice(0, i).trim().toLowerCase();
+      const v = part.slice(i + 1).trim();
+      if (k && v) o[k] = v;
+    });
+    return o;
+  }
+
+  /** 把一个行内节点树展开成 runs */
+  function collectRuns(node, ctx, runs) {
+    for (const child of node.children || []) {
+      if (child.tag === '#text') {
+        const t = ctx.pre ? child.text : core.normSpace(child.text);
+        if (t) runs.push(makeRun(t, ctx));
+        continue;
+      }
+      if (child.tag === 'br') { runs.push({ t: '\n', ...ctxFlags(ctx) }); continue; }
+      if (child.tag === 'img') { ctx.images.push(imageFromNode(child)); continue; }
+      if (child.tag === 'a') {
+        // 超链接文字照常保留（不做超链接，保持版式）
+        collectRuns(child, ctx, runs);
+        continue;
+      }
+      const st = parseStyleAttr(child.attrs && child.attrs.style);
+      const fw = String(st['font-weight'] || '').toLowerCase();
+      const fs2 = String(st['font-style'] || '').toLowerCase();
+      const deco = String(st['text-decoration'] || '') + ' ' + String(st['text-decoration-line'] || '');
+      const vAlign = String(st['vertical-align'] || '').toLowerCase();
+      const next = Object.assign({}, ctx, {
+        b: ctx.b || child.tag === 'b' || child.tag === 'strong' || fw === 'bold' ||
+           (/^\d{3,4}$/.test(fw) && parseInt(fw, 10) >= 600),
+        i: ctx.i || child.tag === 'i' || child.tag === 'em' || fs2 === 'italic' || fs2 === 'oblique',
+        u: ctx.u || child.tag === 'u' || deco.includes('underline'),
+        strike: ctx.strike || child.tag === 's' || child.tag === 'del' || child.tag === 'strike' ||
+          deco.includes('line-through'),
+        sup: ctx.sup || child.tag === 'sup' || vAlign === 'super' || vAlign === 'text-top',
+        sub: ctx.sub || child.tag === 'sub' || vAlign === 'sub',
+        size: parseSize(st['font-size']) || ctx.size,
+        color: normalizeColor(st.color) || ctx.color,
+        font: (st['font-family'] || '').replace(/["']/g, '').split(',')[0].trim() || ctx.font,
+        pre: ctx.pre || child.tag === 'pre'
+      });
+      collectRuns(child, next, runs);
+    }
+    return runs;
+  }
+
+  function ctxFlags(ctx) {
+    return { b: ctx.b, i: ctx.i, u: ctx.u, sup: ctx.sup, sub: ctx.sub, size: ctx.size, color: ctx.color, font: ctx.font };
+  }
+
+  function makeRun(t, ctx) {
+    const r = { t: t };
+    if (ctx.b) r.b = true;
+    if (ctx.i) r.i = true;
+    if (ctx.u) r.u = true;
+    if (ctx.sup) r.sup = true;
+    if (ctx.sub) r.sub = true;
+    if (ctx.strike) r.strike = true;
+    if (ctx.size) r.size = ctx.size;
+    if (ctx.color) r.color = ctx.color;
+    if (ctx.font) r.font = ctx.font;
+    return r;
+  }
+
+  function normalizeColor(c) {
+    if (!c) return null;
+    const s = String(c).trim().toLowerCase();
+    if (/^#[0-9a-f]{3}$/.test(s)) return '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
+    if (/^#[0-9a-f]{6}$/.test(s)) return s;
+    const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(s);
+    if (rgb) return '#' + [1, 2, 3].map(i => (+rgb[i]).toString(16).padStart(2, '0')).join('');
+    if (/^[a-z]+$/.test(s) && s !== 'black') return s === 'white' ? '#ffffff' : null;
+    if (s === 'black') return '#000000';
+    return null;
+  }
+
+  function imageFromNode(node) {
+    const a = node.attrs || {};
+    const src = a.src || '';
+    let w = parseFloat(a.width) || null;
+    let h = parseFloat(a.height) || null;
+    const st = parseStyleAttr(a.style);
+    if (st.width) w = parseFloat(st.width) || w;
+    if (st.height) h = parseFloat(st.height) || h;
+    // px → pt
+    if (w && w > 600) w = w * 0.75;
+    if (h && h > 800) h = h * 0.75;
+    return { dataUrl: src, w: w, h: h, alt: a.alt || '' };
+  }
+
+  /** 段落对齐：style / align 属性 */
+  function alignOf(node) {
+    const st = parseStyleAttr(node.attrs && node.attrs.style);
+    const a = (st['text-align'] || (node.attrs && node.attrs.align) || '').toLowerCase();
+    if (a.includes('center')) return 'center';
+    if (a.includes('right')) return 'right';
+    if (a.includes('justify')) return 'justify';
+    if (a === 'left') return 'left';
+    if (node.tag === 'center') return 'center';
+    return null;
+  }
+
+  function indentOf(node) {
+    const st = parseStyleAttr(node.attrs && node.attrs.style);
+    let first = parseFloat(st['text-indent']);
+    if (isNaN(first)) first = null;
+    else if (Math.abs(first) > 30) first = first * 0.75;   // px → pt
+    return { first: first && first > 0 ? Math.round(first * 10) / 10 : null };
+  }
+
+  /** 判断是否是图题/表题（"图 1 ..." / "表 2 ..." / "Figure 1" / "Table 1"） */
+  function captionKind(text) {
+    const s = (text || '').trim();
+    if (/^(图|圖|Fig\.?|Figure|FIGURE)\s*[0-9一二三四五六七八九十]/.test(s)) return 'figure';
+    if (/^(表|Tab\.?|Table|TABLE)\s*[0-9一二三四五六七八九十]/.test(s)) return 'table';
+    return null;
+  }
+
+  /**
+   * HTML 文档树 → blocks
+   */
+  function htmlToBlocks(rootNode, opts) {
+    opts = opts || {};
+    const blocks = [];
+    const assets = [];
+    const sizes = [];
+    const state = { listStack: [], quote: false };
+
+    function textOf(node) {
+      const runs = collectRuns(node, { images: [] }, []);
+      return core.runsToText(runs);
+    }
+
+    function addImages(imgs, paragraphAlign) {
+      for (const im of imgs) {
+        if (!im.dataUrl) continue;
+        const id = core.uid('img');
+        assets.push({ id, dataUrl: im.dataUrl, w: im.w, h: im.h, alt: im.alt });
+        blocks.push({
+          id: core.uid('b'), type: 'image', assetId: id, w: im.w, h: im.h,
+          align: paragraphAlign || 'center', caption: '', alt: im.alt || ''
+        });
+      }
+    }
+
+    function visit(node, inherited) {
+      const tag = node.tag;
+      if (tag === '#text') {
+        const t = core.normSpace(node.text);
+        if (t.trim()) pushParagraph({ runs: [{ t: t }], tagName: 'p', attrs: node.attrs, inherit: inherited });
+        return;
+      }
+      if (tag === 'table') { blocks.push(tableToIR(node)); return; }
+      if (tag === 'ul' || tag === 'ol') {
+        state.listStack.push({ ordered: tag === 'ol' });
+        for (const c of node.children) visit(c, inherited);
+        state.listStack.pop();
+        return;
+      }
+      if (tag === 'hr') { blocks.push({ id: core.uid('b'), type: 'hr' }); return; }
+      if (tag === 'figure') {
+        for (const c of node.children) visit(c, inherited);
+        return;
+      }
+      if (tag === 'blockquote') {
+        const save = state.quote; state.quote = true;
+        for (const c of node.children) visit(c, inherited);
+        state.quote = save;
+        return;
+      }
+      if (tag === 'pre') {
+        const t = core.runsToText(collectRuns(node, { pre: true, images: [] }, []));
+        blocks.push({ id: core.uid('b'), type: 'code', text: t });
+        return;
+      }
+      if (tag === 'br') { return; }
+
+      const isBlock = BLOCK_TAGS.has(tag) || tag === 'body' || tag === '#root' || tag === 'html' || tag === 'head';
+
+      if (!isBlock) {
+        // 行内容器（span/em/strong/a/img...）：合并成一段
+        const runs = [], images = [];
+        collectRuns(node, { images: images }, runs);
+        if (images.length) addImages(images, 'center');
+        if (core.runsToText(runs).trim()) {
+          pushParagraph({ runs, tagName: 'p', attrs: node.attrs, inherit: inherited });
+        }
+        return;
+      }
+
+      if (tag === 'p' || tag === 'div' || tag === 'section' || tag === 'article' ||
+        /^h[1-6]$/.test(tag) || tag === 'li' || tag === 'figcaption' || tag === 'center' ||
+        tag === 'header' || tag === 'footer' || tag === 'tbody' || tag === 'thead' ||
+        tag === 'tr' || tag === 'td' || tag === 'th') {
+        const runs = [], images = [];
+        collectRuns(node, { images: images }, runs);
+        const align = alignOf(node) || inherited;
+        if (images.length) addImages(images, align || 'center');
+        const hasDirectText = (node.children || []).some(c => c.tag === '#text' && c.text.trim());
+        const hasInline = (node.children || []).some(c => c.tag !== '#text' && !BLOCK_TAGS.has(c.tag) && c.tag !== 'img');
+        if (core.runsToText(runs).trim() || hasDirectText || hasInline) {
+          pushParagraph({ runs, tagName: tag, attrs: node.attrs, inherit: inherited, align: align });
+        }
+        // 处理嵌套块级子节点（如 div 里套 p、li 里套 ul）
+        for (const c of node.children) {
+          if (c.tag === '#text') continue;
+          if (BLOCK_TAGS.has(c.tag) && c.tag !== 'td' && c.tag !== 'th' && c.tag !== 'tr' && c.tag !== 'tbody' && c.tag !== 'thead') {
+            visit(c, align || inherited);
+          }
+        }
+        return;
+      }
+
+      for (const c of node.children) visit(c, inherited);
+    }
+
+    function pushParagraph(p) {
+      let runs = p.runs.filter(r => (r.t != null && r.t !== '') || r.t === '\n');
+      if (!runs.length) return;
+      // 合并同类 run
+      const merged = [];
+      for (const r of runs) {
+        const last = merged[merged.length - 1];
+        const same = last && last.b === r.b && last.i === r.i && last.u === r.u && last.sup === r.sup &&
+          last.sub === r.sub && last.size === r.size && last.color === r.color && last.font === r.font;
+        if (same) last.t += r.t; else merged.push(Object.assign({}, r));
+      }
+      const text = core.runsToText(merged);
+      if (!text.trim()) return;
+      const size = (merged.find(r => r.size) || {}).size || null;
+      if (size) sizes.push(size);
+      const bold = merged.some(r => r.b) && merged.filter(r => r.b).length / merged.length > 0.6;
+      const st = parseStyleAttr(p.attrs && p.attrs.style);
+      const indent = indentOf(p);
+      const align = p.align || null;
+      const listInfo = state.listStack.length ? state.listStack[state.listStack.length - 1] : null;
+
+      const node = {
+        id: core.uid('b'),
+        type: 'paragraph',
+        runs: merged,
+        align: align || (listInfo ? 'left' : null),
+        indent: indent.first,
+        size: size,
+        bold: bold,
+        styleName: p.tagName,
+        list: listInfo ? { ordered: !!listInfo.ordered, level: state.listStack.length - 1 } : null,
+        quote: state.quote || undefined
+      };
+      if (p.tagName === 'figcaption') node.styleName = 'figcaption';
+      blocks.push(node);
+    }
+
+    visit(rootNode, null);
+    return { blocks, assets, sizes };
+  }
+
+  /** HTML <table> → IR table（含合并单元格） */
+  function tableToIR(tableNode) {
+    const rows = [];
+    const rowNodes = [];
+    (function collectRows(n) {
+      for (const c of n.children || []) {
+        if (c.tag === 'tr') { rowNodes.push(c); }
+        else if (c.tag === 'thead' || c.tag === 'tbody' || c.tag === 'tfoot' || c.tag === 'table') collectRows(c);
+      }
+    })(tableNode);
+
+    const grid = [];          // 稀疏网格，记录占用
+    for (let ri = 0; ri < rowNodes.length; ri++) {
+      const tr = rowNodes[ri];
+      if (!grid[ri]) grid[ri] = [];
+      let ci = 0;
+      for (const cell of (tr.children || [])) {
+        if (cell.tag !== 'td' && cell.tag !== 'th') continue;
+        while (grid[ri][ci]) ci++;
+        const cs = Math.max(1, parseInt((cell.attrs && cell.attrs.colspan) || '1', 10) || 1);
+        const rs = Math.max(1, parseInt((cell.attrs && cell.attrs.rowspan) || '1', 10) || 1);
+        const runs = [], images = [];
+        collectRuns(cell, { images: images }, runs);
+        if (typeof module === 'object' && module.exports && global.__LY_DEBUG) {
+          console.log('[cell]', cell.tag, 'kids=', (cell.children || []).map(c => c.tag).join(','), 'runs=', JSON.stringify(runs));
+        }
+        const cellIR = {
+          text: core.normSpace(core.runsToText(runs)).trim(),
+          runs: runs,
+          header: cell.tag === 'th',
+          align: alignOf(cell),
+          colspan: cs, rowspan: rs,
+          size: (runs.find(r => r.size) || {}).size || null
+        };
+        if (images.length && images[0].dataUrl) cellIR.image = images[0];
+        for (let r = ri; r < ri + rs; r++) {
+          if (!grid[r]) grid[r] = [];
+          for (let c = ci; c < ci + cs; c++) grid[r][c] = cellIR;
+        }
+        ci += cs;
+      }
+    }
+    const maxCols = Math.max(1, ...grid.map(r => r.length));
+    for (let ri = 0; ri < grid.length; ri++) {
+      const row = [];
+      for (let ci = 0; ci < maxCols; ci++) {
+        const c = grid[ri][ci];
+        row.push(c || { text: '', runs: [], colspan: 1, rowspan: 1 });
+      }
+      rows.push(row);
+    }
+    return { id: core.uid('t'), type: 'table', rows, headerRows: rowNodes.length && (rowNodes[0].children || []).some(c => c.tag === 'th') ? 1 : 0 };
+  }
+
+  /* ======================================================================
+   * 三、抽取结果的后处理：字号统计、标题识别、图题合并
+   * ====================================================================*/
+
+  function postProcess(blocks, extras) {
+    const sizes = (extras && extras.sizes) || [];
+    // 正文字号 = 出现最多的字号
+    const freq = new Map();
+    sizes.forEach(s => freq.set(s, (freq.get(s) || 0) + 1));
+    let body = 10.5, best = -1;
+    for (const [s, n] of freq) if (n > best) { best = n; body = s; }
+    if (!sizes.length) body = 10.5;
+
+    // 全文字号排序，用于标题分级
+    const uniq = [...new Set(sizes)].sort((a, b) => b - a);
+
+    const out = [];
+    let figureIndex = 0;
+    let firstCenteredBoldSeen = false;
+    const maxSize = uniq.length ? uniq[0] : 0;
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      if (b.type !== 'paragraph') {
+        if (b.type === 'image') figureIndex++;
+        out.push(b);
+        continue;
+      }
+      const text = core.runsToText(b.runs).trim();
+      const size = b.size || body;
+      const boldLike = !!b.bold;
+      const centered = b.align === 'center';
+      // 标题判定：与 PDF 路径共用 core 中的统一规则
+      const boldRuns = (b.runs || []).some(r => r.b);
+      let level = core.classifyHeading(b, { bodySize: body, sizes: uniq });
+      if (!level && (boldLike || boldRuns) && centered && size >= maxSize - 0.2 && text.length > 6 && text.length <= 90 &&
+          out.filter(x => x.type !== 'image').length < 2 && !/[。；;]$/.test(text)) {
+        level = 1;   // 文档开头、字号最大、居中加粗 → 主标题
+      }
+      if (!b.bold && boldRuns) b.bold = true;
+
+      // 图题合并到前面的图片上
+      const capKind = captionKind(text);
+      if (capKind === 'figure' && out.length) {
+        for (let k = out.length - 1; k >= 0 && k >= out.length - 3; k--) {
+          if (out[k].type === 'image' && !out[k].caption) {
+            out[k].caption = text;
+            out[k].captionRuns = b.runs;
+            level = 0;
+            break;
+          }
+          if (out[k].type === 'paragraph' && core.runsToText(out[k].runs).trim()) break;
+        }
+      }
+      if (level > 0) {
+        b.type = 'heading';
+        b.level = Math.min(4, Math.max(1, level));
+        // 文档最开头、字号最大且居中加粗的块 = 主标题
+        if (!firstCenteredBoldSeen && centered && boldLike && size >= maxSize - 0.2 && text.length > 8 &&
+            !/[。；;]$/.test(text) && out.filter(x => x.type !== 'image').length < 2) {
+          b.level = 1;
+          firstCenteredBoldSeen = true;
+        }
+        b.align = b.align || (b.level === 1 && centered ? 'center' : null);
+      }
+      out.push(b);
+    }
+
+    // 段落间距启发式：标题前后留白
+    return { blocks: out, bodySize: body, sizes: uniq };
+  }
+
+  /* ======================================================================
+   * 四、对外接口
+   * ====================================================================*/
+
+  /**
+   * 从 docx ArrayBuffer 抽取 IR
+   * @param {ArrayBuffer} arrayBuffer
+   * @param {Object} opts { mammoth, fileName }
+   */
+  async function extractDocx(arrayBuffer, opts) {
+    opts = opts || {};
+    const mammoth = opts.mammoth || (typeof root !== 'undefined' && root.mammoth) || null;
+    if (!mammoth) throw new Error('缺少 mammoth 库，无法解析 Word 文档');
+
+    const messages = [];
+    const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer }, {
+      convertImage: mammoth.images.imgElement(function (image) {
+        return image.read('base64').then(function (base64) {
+          return { src: 'data:' + (image.contentType || 'image/png') + ';base64,' + base64 };
+        });
+      }),
+      includeDefaultStyleMap: true,
+      styleMap: [
+        "p[style-name='Title'] => h1.title:fresh",
+        "p[style-name='标题'] => h1:fresh",
+        "p[style-name='Subtitle'] => p.subtitle:fresh",
+        "p[style-name='Heading 1'] => h1:fresh",
+        "p[style-name='Heading 2'] => h2:fresh",
+        "p[style-name='Heading 3'] => h3:fresh",
+        "p[style-name='heading 1'] => h1:fresh",
+        "p[style-name='heading 2'] => h2:fresh",
+        "p[style-name='heading 3'] => h3:fresh"
+      ]
+    });
+    if (result.messages) result.messages.forEach(m => messages.push(m.message));
+
+    const ir = convertHtmlToIR(result.value, { fileName: opts.fileName || '' });
+    ir.source = 'docx';
+    ir.messages = messages;
+    return ir;
+  }
+
+  /** HTML 字符串 → IR（也用于 .html 文件与 mammoth 输出） */
+  function convertHtmlToIR(html, opts) {
+    opts = opts || {};
+    const dom = parseHTML(html);
+    const { blocks, assets, sizes } = htmlToBlocks(dom, opts);
+    const post = postProcess(blocks, { sizes });
+    const ir = core.newIR({
+      source: 'docx',
+      meta: { fileName: opts.fileName || '' },
+      assets: assets
+    });
+    ir.blocks = post.blocks;
+    ir.bodySize = post.bodySize;
+    ir.fontSizes = post.sizes;
+    // 表格占多数时不采用正文缩进
+    return ir;
+  }
+
+  return {
+    parseHTML, parseStyleAttr, parseSize, normalizeColor, decodeEntities,
+    htmlToBlocks, tableToIR, postProcess, captionKind,
+    extractDocx, convertHtmlToIR, STYLE_FALLBACK
+  };
+});
+
+</script>
+<!-- ==================== pdf-extract.js ==================== -->
+<script>
+/* ============================================================================
+ * 灵译 · PDF 结构抽取 (pdf-extract.js)
+ * ----------------------------------------------------------------------------
+ * 不再把 PDF 压成一行行纯文本！而是还原出：
+ *   · 分栏（单栏/双栏/通栏标题）与阅读顺序
+ *   · 每个段落的字号、加粗、对齐、首行缩进
+ *   · 表格（列数、单元格、合并）
+ *   · 页码/页眉页脚过滤
+ * 依赖 pdf.js（pdfjsLib）。
+ * © 2026 灵译 LingYi · 个人使用免费，商业使用需授权（见 LICENSE）
+ * ========================================================================== */
+(function (root, factory) {
+  const core = (typeof module === 'object' && module.exports) ? require('./core.js') : root.LingyiCore;
+  const layout = (typeof module === 'object' && module.exports) ? require('./layout.js') : root.LingyiLayout;
+  const mod = factory(core, layout);
+  if (typeof module === 'object' && module.exports) module.exports = mod;
+  root.LingyiPdfExtract = mod;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (core, layout) {
+  'use strict';
+
+  /* ------------------------------------------------------------ 字体样式推断 */
+
+  function inferStyle(fontName, size, bodySize) {
+    const f = String(fontName || '');
+    const r = { size: Math.round(size * 10) / 10 };
+    if (/bold|black|heavy|semibold|demibold|-bd\b|[,+]B(?![a-z])/i.test(f)) r.b = true;
+    if (/italic|oblique|-it\b/i.test(f)) r.i = true;
+    if (/mono|courier|consol|typewriter|menlo/i.test(f)) r.mono = true;
+    if (/serif|times|georgia|song|ming|garamond|book/i.test(f) && !/sans/i.test(f)) r.serif = true;
+    return r;
+  }
+
+  function fontsCompat(fontName) {
+    // pdf.js 常用 FontName 形如 "ABCDEF+Times-Bold"，去掉子集前缀
+    return String(fontName || '').replace(/^[A-Z]{6}\+/, '');
+  }
+
+  /**
+   * 去掉"重复文字层"：不少 PDF（尤其是经过 OCR/二次排版的）会在同一位置放两层文字
+   * （一层可见正文，一层不可见的检索层）。这里按位置聚类后保留信息量最大的那一层，
+   * 否则会出现"中国优生X与I遗EY传，杂OU志YA"这种交错乱码。
+   */
+  function dedupeTextLayers(items) {
+    if (items.length < 4) return items;
+    const sorted = items.slice().sort((a, b) => (a.y0 - b.y0) || (a.x0 - b.x0));
+    const used = new Array(sorted.length).fill(false);
+    const out = [];
+    const cjkCount = s => (String(s).match(/[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g) || []).length;
+    for (let i = 0; i < sorted.length; i++) {
+      if (used[i]) continue;
+      const a = sorted[i];
+      const group = [a];
+      used[i] = true;
+      const tol = Math.max(2.5, (a.size || 10) * 0.6);
+      for (let j = i + 1; j < sorted.length; j++) {
+        if (used[j]) continue;
+        const b = sorted[j];
+        if (b.y0 - a.y0 > tol) break;                       // 已越过同一行
+        const xOverlap = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+        const union = Math.max(a.x1, b.x1) - Math.min(a.x0, b.x0);
+        const overlapping = xOverlap > 1 && union > 0 && xOverlap / union > 0.45;
+        const nearLeft = Math.abs(a.x0 - b.x0) < Math.max(3, (a.size || 10) * 0.5);
+        if (overlapping || nearLeft) { group.push(b); used[j] = true; }
+      }
+      if (group.length === 1) { out.push(a); continue; }
+      group.sort((p, q) => {                                 // 同一位置多层：留信息量最大的
+        const cq = cjkCount(q.str), cp = cjkCount(p.str);
+        if (cq !== cp) return cq - cp;
+        if (q.str.length !== p.str.length) return q.str.length - p.str.length;
+        return (q.size || 0) - (p.size || 0);
+      });
+      out.push(group[0]);
+    }
+    return out.sort((a, b) => (a.y0 - b.y0) || (a.x0 - b.x0));
+  }
+
+  /* ---------------------------------------------------------- 单个片段的构造 */
+
+  function makeItem(textContentItem, styles) {
+    const tr = textContentItem.transform || [1, 0, 0, 1, 0, 0];
+    const fontName = (styles && styles[textContentItem.fontName] && styles[textContentItem.fontName].fontFamily) || textContentItem.fontName || '';
+    // 字号：优先用 transform 的缩放（pdf.js 习惯），回退到 height
+    const scale = Math.hypot(tr[2], tr[3]) || Math.abs(tr[3]) || 1;
+    const size = scale > 0.01 ? scale : (Math.abs(textContentItem.height) || 10);
+    const h = textContentItem.height != null ? Math.abs(textContentItem.height) : size;
+    // pdf.js 的 transform[5] 是"基线 y"，且 y 轴向上；统一翻成屏幕坐标（y 轴向下）
+    const baseline = textContentItem.pageHeight != null ? (textContentItem.pageHeight - tr[5]) : tr[5];    // 宽度：pdf.js 的 item.width 已经包含了变换后的缩放
+    let w = textContentItem.width;
+    if (w == null || !isFinite(w)) w = size * 0.5 * String(textContentItem.str || '').length;
+    return {
+      str: textContentItem.str == null ? '' : String(textContentItem.str),
+      x0: tr[4],
+      y0: baseline - (h || size) * 0.25,
+      x1: tr[4] + Math.abs(w),
+      y1: baseline + (h || size) * 0.85,
+      size: size,
+      font: fontsCompat(fontName),
+      hasEOL: !!textContentItem.hasEOL,
+      dir: textContentItem.dir || 'ltr'
+    };
+  }
+
+  /**
+   * 坐标系归一化：有些 PDF 的正文在 Form XObject 中，带有额外的变换矩阵，
+   * 抽出来的坐标会跑到页外。这里用"仿射拟合"把它映射回页面坐标。
+   */
+  function normalizePageCoords(items, pageW, pageH) {
+    if (!items.length) return items;
+    const xs = items.map(i => i.x0), ys = items.map(i => i.y0);
+    const xr = [Math.min(...xs), Math.max(...xs)];
+    const yr = [Math.min(...ys), Math.max(...ys)];
+    const xSpan = xr[1] - xr[0], ySpan = yr[1] - yr[0];
+    const outOfRange = xr[0] < -2 || yr[0] < -2 ||
+      xr[1] > pageW * 1.05 || yr[1] > pageH * 1.05;
+    const scaleMismatch = (xSpan > pageW * 1.1 && xSpan > 40) || (ySpan > pageH * 1.1 && ySpan > 40);
+    if (!outOfRange && !scaleMismatch) return items;
+    // 目标：左右留 6%，上下留 5%
+    const tx0 = pageW * 0.06, tx1 = pageW * 0.94;
+    const ty0 = pageH * 0.95, ty1 = pageH * 0.05;   // y 轴向下
+    const sx = xSpan > 1 ? (tx1 - tx0) / xSpan : 1;
+    const sy = ySpan > 1 ? (ty0 - ty1) / ySpan : 1;
+    const s = Math.min(sx, sy);
+    return items.map(it => {
+      const x = tx0 + (it.x0 - xr[0]) * s;          // 新左边界
+      const y = ty0 - (it.y0 - yr[0]) * s;          // 新基线（y 向下）
+      const w = (it.x1 - it.x0) * s;
+      const h = (it.y1 - it.y0) * s;
+      return Object.assign({}, it, {
+        x0: x, x1: x + w,
+        y0: y - h * 0.65, y1: y + h * 0.35,
+        size: it.size * s
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------ 页眉页脚过滤 */
+
+  function filterMargins(items, pageH, pageW) {
+    if (items.length < 8) return { items: items, headerLine: null, footerLine: null };
+    const sorted = items.slice().sort((a, b) => a.y0 - b.y0);
+    const topItems = sorted.filter(it => it.y0 < pageH * 0.085);
+    const bottomItems = sorted.filter(it => it.y0 > pageH * 0.915);
+    // 页眉页脚特征：字号小于正文、且位于上下 8.5% 区域内
+    const drop = new Set();
+    const headSizes = topItems.map(i => i.size);
+    const footSizes = bottomItems.map(i => i.size);
+    const bodySizes = sorted.map(i => i.size).sort((a, b) => a - b);
+    const med = bodySizes[Math.floor(bodySizes.length / 2)] || 10;
+    for (const it of topItems) if (it.size <= med * 0.95 || /^\d{1,4}$/.test(it.str.trim())) drop.add(it);
+    for (const it of bottomItems) if (it.size <= med * 0.95 || /^\d{1,4}$/.test(it.str.trim())) drop.add(it);
+    return {
+      items: items.filter(it => !drop.has(it)),
+      dropped: drop.size,
+      medianSize: med
+    };
+  }
+
+  /* -------------------------------------------------------------- 行 → 段落 */
+
+  const PARA_END = /[。！？；.!?;:：]["'”’)\]]?$/;
+  const CJK_CHAR = /[\u2E80-\u9FFF\uF900-\uFAFF\u3000-\u303F\uFF00-\uFFEF]/;
+
+  function linesToDocText(items) {
+    return core.smartJoin(items.map(i => i.str));
+  }
+
+  /**
+   * 把区域内的行合并成段落
+   * @param {Array} lines layout.groupLines 的输出
+   */
+  function linesToParagraphs(lines) {
+    const paras = [];
+    let cur = null;
+    for (let i = 0; i < lines.length; i++) {
+      const ln = lines[i];
+      const text = core.normSpace(linesToDocText(ln.items));
+      if (!text.trim()) continue;
+      const leftEdge = Math.min(...ln.items.map(it => it.x0));
+      const prev = i > 0 ? lines[i - 1] : null;
+      const gap = prev ? (ln.y0 - prev.y1) : 0;
+      const lineH = Math.max(1, ln.y1 - ln.y0);
+      let newPara = false;
+      if (!cur) newPara = true;
+      else {
+        // 竖向间距过大 → 新段落
+        if (prev && gap > Math.max(lineH * 0.72, ln.size * 0.8)) newPara = true;
+        // 上一行已句末 + 当前行有缩进 → 新段落
+        if (prev) {
+          const prevText = core.normSpace(linesToDocText(prev.items));
+          const indent = leftEdge - Math.min(...prev.items.map(it => it.x0));
+          if (PARA_END.test(prevText) && indent > ln.size * 0.6) newPara = true;
+        }
+        // 首行缩进（空两格）本身是段落起点
+        if (leftEdge - cur.leftEdge > ln.size * 0.6) newPara = true;
+        // 字号突变（标题→正文）→ 新段落
+        if (Math.abs(ln.size - cur.size) > Math.max(1.2, cur.size * 0.12)) newPara = true;
+      }
+      if (newPara) {
+        cur = { lines: [ln], leftEdge: leftEdge, rightEdge: Math.max(...ln.items.map(it => it.x1)), size: ln.size, text: text };
+        paras.push(cur);
+      } else {
+        cur.lines.push(ln);
+        cur.text = joinParagraph(cur.text, text);
+        cur.size = Math.max(cur.size, ln.size);
+        cur.rightEdge = Math.max(cur.rightEdge, Math.max(...ln.items.map(it => it.x1)));
+      }
+    }
+    return paras;
+
+    function joinParagraph(a, b) {
+      return core.smartJoin([a, b]);
+    }
+  }
+
+  /* -------------------------------------------------- 行块 → 表格（表格优先） */
+
+  /**
+   * 在区域内找出连续的表格行，切开成表格块 / 段落块
+   */
+  function segmentTableAndText(lines) {
+    const out = [];
+    let i = 0;
+    while (i < lines.length) {
+      let found = null;
+      // 优先取"从 i 开始最长且成立"的表格
+      for (let j = lines.length; j >= i + 2; j--) {
+        const cand = lines.slice(i, j);
+        const t = layout.detectTable(cand, { minCols: 2, minRows: 2 });
+        if (t && t.quality >= 0.8 && t.colCount >= 2) { found = { t: t, lines: cand }; break; }
+      }
+      if (found) {
+        out.push({ kind: 'table', table: found.t, lines: found.lines });
+        i += found.lines.length;
+        continue;
+      }
+      // 否则并入文本行
+      if (out.length && out[out.length - 1].kind === 'text') out[out.length - 1].lines.push(lines[i]);
+      else out.push({ kind: 'text', lines: [lines[i]] });
+      i++;
+    }
+    return out;
+  }
+
+  /* ---------------------------------------------------------------- 主流程 */
+
+  /**
+   * @param {File|ArrayBuffer} file
+   * @param {Object} opts { pdfjs, maxPages, fileName, onProgress }
+   */
+  async function extractPDF(file, opts) {
+    opts = opts || {};
+    const pdfjs = opts.pdfjs || (typeof root !== 'undefined' && root.pdfjsLib);
+    if (!pdfjs) throw new Error('缺少 pdf.js 库，无法解析 PDF');
+
+    const data = file instanceof ArrayBuffer ? new Uint8Array(file) : await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: data }).promise;
+    const maxPages = Math.min(pdf.numPages, opts.maxPages || 200);
+
+    const pages = [];
+    for (let p = 1; p <= maxPages; p++) {
+      const page = await pdf.getPage(p);
+      const viewport = page.getViewport({ scale: 1 });
+      const textContent = await page.getTextContent();
+      let items = textContent.items
+        .filter(it => it && it.str !== undefined && String(it.str).length)
+        .map(it => makeItem(it, textContent.styles));
+      const filtered = filterMargins(items, viewport.height, viewport.width);
+      // 双重文字层去重是"有风险但有用"的启发式，默认关闭，可在调用时打开
+      const deduped = opts.dedupeTextLayers ? dedupeTextLayers(filtered.items) : filtered.items;
+      pages.push({
+        number: p, width: viewport.width, height: viewport.height,
+        items: normalizePageCoords(deduped, viewport.width, viewport.height),
+        medianSize: filtered.medianSize
+      });
+      if (opts.onProgress) opts.onProgress(p, maxPages);
+    }
+
+    // 正文字号 = 全篇字符数加权的中位数
+    const sizeHist = new Map();
+    for (const pg of pages) for (const it of pg.items) {
+      const key = Math.round(it.size * 2) / 2;
+      sizeHist.set(key, (sizeHist.get(key) || 0) + it.str.length);
+    }
+    const bodySize = (() => {
+      let best = 10.5, bestN = -1;
+      for (const [s, n] of sizeHist) {
+        // 只考虑 7~20pt 之间的字号，避免被大标题或小注脚带偏
+        if (s < 7 || s > 20) continue;
+        if (n > bestN) { bestN = n; best = s; }
+      }
+      return best;
+    })();
+
+    const assets = [];
+    const blocks = [];
+    pages.forEach(function (pg, pageIdx) {
+      if (!pg.items.length) return;
+      const regions = layout.analyzePage(pg.items, {});
+      // 同一"栏带"内的区域（左栏/右栏）合并成一个分栏容器，输出时才能保住双栏版式
+      let pendingBand = null;
+      const flushBand = () => {
+        if (!pendingBand) return;
+        if (pendingBand.groups.length === 1) blocks.push(...pendingBand.groups[0].blocks);
+        else blocks.push({ id: core.uid('c'), type: 'container', columns: pendingBand.groups });
+        pendingBand = null;
+      };
+      regions.forEach(function (region) {
+        const regionBlocks = [];
+        const segs = segmentTableAndText(region.lines);
+        for (const seg of segs) {
+          if (seg.kind === 'table') {
+            const block = tableToIR(seg.table, bodySize);
+            if (block) regionBlocks.push(block);
+            continue;
+          }
+          const paras = linesToParagraphs(seg.lines);
+          for (const para of paras) {
+            const b = paragraphToIR(para, bodySize, region);
+            if (b) regionBlocks.push(b);
+          }
+        }
+        if (!regionBlocks.length) return;
+        const isWide = region.spanning || (region.box.x1 - region.box.x0) > pg.width * 0.82;
+        if (isWide) {
+          flushBand();
+          blocks.push(...regionBlocks);                 // 通栏内容直接平铺
+          return;
+        }
+        if (!pendingBand) pendingBand = { groups: [] };
+        pendingBand.groups.push({ width: Math.round((region.box.x1 - region.box.x0) * 10) / 10, blocks: regionBlocks });
+      });
+      flushBand();
+      // 页与页之间保留分页（保证打印/导出后分页位置与原 PDF 一致）
+      if (pageIdx < pages.length - 1 && blocks.length) {
+        blocks.push({ id: core.uid('b'), type: 'pagebreak' });
+      }
+    });
+
+    const ir = core.newIR({
+      source: 'pdf',
+      fileName: opts.fileName || '',
+      page: {
+        width: pages[0] ? Math.round(pages[0].width * 100) / 100 : 595.28,
+        height: pages[0] ? Math.round(pages[0].height * 100) / 100 : 841.89,
+        margin: estimateMargins(pages)
+      },
+      assets: assets
+    });
+    ir.blocks = blocks;
+    while (ir.blocks.length && ir.blocks[ir.blocks.length - 1].type === 'pagebreak') ir.blocks.pop();
+    ir.bodySize = bodySize;
+    ir.fontSizes = [...new Set(pages.flatMap(p => p.items.map(i => Math.round(i.size * 2) / 2)))].sort((a, b) => b - a);
+    // 标题层级判定（与 Word 路径共用同一套规则）
+    core.applyHeadingLevels(ir, {});
+    delete ir.messages;
+    return ir;
+  }
+
+  function regionIndex(regions, region) {
+    const i = regions.indexOf(region);
+    return i < 0 ? 0 : i;
+  }
+
+  function estimateMargins(pages) {
+    const lefts = [], rights = [], tops = [], bottoms = [], gaps = [];
+    for (const pg of pages) {
+      for (const it of pg.items) {
+        lefts.push(it.x0); rights.push(pg.width - it.x1);
+        tops.push(it.y0); bottoms.push(pg.height - it.y1);
+      }
+      // 版面上下的大块留白比"5% 分位"更能代表真实页边距
+      const lines = layout.groupLines(pg.items);
+      const sizes = lines.map(l => l.size || 10).sort((a, b) => a - b);
+      const medSize = sizes[Math.floor(sizes.length / 2)] || 10;
+      for (let i = 1; i < lines.length; i++) {
+        const g = lines[i].y0 - lines[i - 1].y1;
+        if (g > medSize * 2.2) gaps.push({ gap: g, after: lines[i - 1].y1, before: lines[i].y0 });
+      }
+    }
+    const q = (arr, p) => {
+      if (!arr.length) return 56.7;
+      const a = arr.slice().sort((x, y) => x - y);
+      return a[Math.min(a.length - 1, Math.max(0, Math.floor(a.length * p)))];
+    };
+    // 取最大的纵向留白作为页边距（页面最上方/最下方）
+    let top = q(tops, 0.05), bottom = q(bottoms, 0.05);
+    if (gaps.length) {
+      gaps.sort((a, b) => b.gap - a.gap);
+      const g = gaps[0];
+      top = Math.min(top, g.after);
+      // 底部留白
+      const bottomsFromGap = pages.map(pg => pg.height - g.before);
+      bottom = Math.min(bottom, Math.min(...bottomsFromGap));
+    }
+    const clamp = v => Math.max(18, Math.min(140, Math.round(v * 10) / 10));
+    return [clamp(q(lefts, 0.05)), clamp(top), clamp(q(rights, 0.05)), clamp(bottom)];
+  }
+
+  /**
+   * 表格区域 → IR 表格块
+   */
+  function tableToIR(t, bodySize) {
+    if (!t || !t.grid || !t.grid.length) return null;
+    const rows = t.grid.map(row => row.map(cell => {
+      if (!cell) return { text: '', runs: [], colspan: 1, rowspan: 1 };
+      const items = cell.items.slice().sort((a, b) => (a.y0 - b.y0) || (a.x0 - b.x0));
+      const text = core.smartJoin(items.map(i => i.str)).trim();
+      const size = items.length ? Math.round(items[0].size * 10) / 10 : null;
+      const bold = items.length ? items.filter(i => /bold|black|heavy|semibold/i.test(i.font)).length > items.length / 2 : false;
+      const numeric = /^[\d.,%±<>≤≥~\-–—\s()]+$/.test(text);
+      const runs = [{ t: text }];
+      if (size) runs[0].size = size;
+      if (bold) runs[0].b = true;
+      return {
+        text: text, runs: runs, colspan: 1, rowspan: 1,
+        size: size,
+        align: numeric ? 'center' : null
+      };
+    }));
+    return {
+      id: core.uid('t'), type: 'table', rows: rows,
+      headerRows: 1,
+      source: 'pdf', columnCount: t.colCount
+    };
+  }
+
+  /**
+   * 段落 → IR 段落块（保留字号、加粗、缩进、对齐）
+   */
+  function paragraphToIR(para, bodySize, region) {
+    const allItems = para.lines.flatMap(l => l.items);
+    if (!allItems.length) return null;
+    const text = core.normSpace(para.text);
+    if (!text.trim()) return null;
+
+    const sizes = allItems.map(i => i.size).sort((a, b) => a - b);
+    const size = Math.round(sizes[Math.floor(sizes.length / 2)] * 10) / 10;
+    const boldCount = allItems.filter(i => /bold|black|heavy|semibold|demibold/i.test(i.font)).length;
+    const bold = boldCount > allItems.length * 0.6;
+    const mono = allItems.filter(i => /mono|courier|consol/i.test(i.font)).length > allItems.length * 0.6;
+
+    // 对齐推断：比较左右边界与区域边界
+    const rBox = region ? region.box : layout.unionBox(allItems);
+    const leftGap = Math.min(...allItems.map(i => i.x0)) - rBox.x0;
+    const rightGap = rBox.x1 - Math.max(...allItems.map(i => i.x1));
+    const lineWidths = para.lines.map(l => Math.max(...l.items.map(i => i.x1)) - Math.min(...l.items.map(i => i.x0)));
+    const avgW = lineWidths.reduce((a, b) => a + b, 0) / Math.max(1, lineWidths.length);
+    const regionW = rBox.x1 - rBox.x0;
+    let align = null;
+    if (para.lines.length === 1 && avgW < regionW * 0.72) {
+      if (Math.abs(leftGap - rightGap) < Math.max(8, regionW * 0.08)) align = 'center';
+      else if (rightGap < leftGap * 0.4) align = 'right';
+    } else if (para.lines.length > 1) {
+      const rights = para.lines.map(l => Math.max(...l.items.map(i => i.x1)));
+      const spread = Math.max(...rights) - Math.min(...rights);
+      if (spread < size * 1.2 && avgW > regionW * 0.8) align = 'justify';
+    }
+
+    // 首行缩进
+    let indent = null;
+    if (para.lines.length > 1) {
+      const first = para.lines[0], rest = para.lines.slice(1);
+      const fLeft = Math.min(...first.items.map(i => i.x0));
+      const rLeft = Math.min(...rest.flatMap(l => l.items.map(i => i.x0)));
+      const d = fLeft - rLeft;
+      if (d > size * 0.5 && d < size * 4) indent = Math.round(d * 10) / 10;
+    } else {
+      const d = Math.min(...allItems.map(i => i.x0)) - rBox.x0;
+      if (d > size * 0.5 && d < size * 4) indent = Math.round(d * 10) / 10;
+    }
+
+    // 行距估算
+    let lineHeight = null;
+    if (para.lines.length > 1) {
+      const baselines = para.lines.map(l => l.cy);
+      const diffs = [];
+      for (let i = 1; i < baselines.length; i++) diffs.push(baselines[i] - baselines[i - 1]);
+      diffs.sort((a, b) => a - b);
+      const med = diffs[Math.floor(diffs.length / 2)];
+      if (med && size) lineHeight = Math.round((med / size) * 100) / 100;
+    }
+
+    const runs = [];
+    // 保留文字内部的样式差异（粗体词、斜体词）
+    for (const item of allItems) {
+      const st = inferStyle(item.font, item.size, bodySize);
+      const t = item.str;
+      if (!t) continue;
+      const last = runs[runs.length - 1];
+      const sameStyle = last && !!last.b === !!st.b && !!last.i === !!st.i &&
+        Math.abs((last.size || size) - (st.size || size)) < 0.3;
+      if (sameStyle) last.t = core.smartJoin([last.t, t]);
+      else runs.push(Object.assign({ t: t }, st, { size: st.size }));
+    }
+    // 合并后统一字号：与中位字号差异很小的直接用中位字号，减少噪声
+    for (const r of runs) if (r.size && Math.abs(r.size - size) < 0.4) r.size = size;
+
+    return {
+      id: core.uid('b'),
+      type: 'paragraph',
+      runs: runs.length ? runs : [{ t: text, size: size }],
+      size: size,
+      bold: bold,
+      mono: mono || undefined,
+      align: align,
+      indent: indent,
+      lineHeight: lineHeight,
+      source: 'pdf',
+      __para: true
+    };
+  }
+
+  return {
+    extractPDF, makeItem, filterMargins, linesToParagraphs, segmentTableAndText,
+    tableToIR, paragraphToIR, inferStyle, fontsCompat, normalizePageCoords,
+    estimateMargins, dedupeTextLayers
+  };
+});
+
+</script>
+<!-- ==================== render-html.js ==================== -->
+<script>
+/* ============================================================================
+ * 灵译 · HTML 渲染器 (render-html.js)
+ * ----------------------------------------------------------------------------
+ * 把 IR 骨架渲染成"像素级还原"的 HTML 页面：
+ *   · 多栏排版（学术论文双栏）
+ *   · 段落字号/对齐/首行缩进/行距
+ *   · 表格列宽（按内容比例）、合并单元格
+ *   · 图片按原尺寸
+ *   · 对照模式：左右双语并排
+ * 该 HTML 既能在浏览器预览，也能直接用浏览器"打印为 PDF"（矢量、可选中）。
+ * © 2026 灵译 LingYi · 个人使用免费，商业使用需授权（见 LICENSE）
+ * ========================================================================== */
+(function (root, factory) {
+  const core = (typeof module === 'object' && module.exports) ? require('./core.js') : root.LingyiCore;
+  const mod = factory(core);
+  if (typeof module === 'object' && module.exports) module.exports = mod;
+  root.LingyiRenderHtml = mod;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (core) {
+  'use strict';
+
+  const PT_TO_PX = 96 / 72;
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function runsToHtml(runs, defaultSize) {
+    if (!runs || !runs.length) return '';
+    return runs.map(r => {
+      let t = esc(r.t == null ? '' : r.t).replace(/\n/g, '<br>');
+      if (t === '') return '';
+      let style = '';
+      if (r.size && defaultSize && Math.abs(r.size - defaultSize) > 0.05) style += `font-size:${r.size}pt;`;
+      if (r.color) style += `color:${r.color};`;
+      if (r.font) style += `font-family:'${String(r.font).replace(/'/g, '')}',inherit;`;
+      let inner = t;
+      if (r.i) inner = `<em>${inner}</em>`;
+      if (r.b) inner = `<strong>${inner}</strong>`;
+      if (r.u) inner = `<u>${inner}</u>`;
+      if (r.strike) inner = `<s>${inner}</s>`;
+      if (r.sup) inner = `<sup>${inner}</sup>`;
+      if (r.sub) inner = `<sub>${inner}</sub>`;
+      return style ? `<span style="${style}">${inner}</span>` : inner;
+    }).join('');
+  }
+
+  function textOf(b) {
+    if (b.type === 'image') return b.caption || '';
+    return core.runsToText(b.runs);
+  }
+
+  /** 表格列宽：按各列最大字符数分配，最少 5% */
+  function computeColWidths(rows, maxCols) {
+    const weights = new Array(maxCols).fill(1);
+    for (const row of rows) {
+      for (let i = 0; i < maxCols; i++) {
+        const cell = row[i];
+        if (!cell) continue;
+        const len = Math.min(60, core.charCount((cell.text || '').replace(/\s/g, '')));
+        if (len > weights[i]) weights[i] = len;
+      }
+    }
+    const total = weights.reduce((a, b) => a + b, 0) || 1;
+    return weights.map(w => Math.max(5, Math.round(w / total * 1000) / 10));
+  }
+
+  function tableToHtml(t, opts) {
+    const maxCols = Math.max(1, ...(t.rows || []).map(r => r.length));
+    const widths = computeColWidths(t.rows || [], maxCols);
+    const used = [];
+    let html = `<table class="ly-table"><colgroup>${widths.map(w => `<col style="width:${w}%">`).join('')}</colgroup>`;
+    (t.rows || []).forEach((row, ri) => {
+      if (!used[ri]) used[ri] = [];
+      html += '<tr>';
+      for (let ci = 0; ci < row.length; ci++) {
+        if (used[ri][ci]) continue;
+        const cell = row[ci] || {};
+        const cs = cell.colspan || 1, rs = cell.rowspan || 1;
+        for (let r = ri; r < ri + rs; r++) {
+          used[r] = used[r] || [];
+          for (let c = ci; c < ci + cs; c++) used[r][c] = true;
+        }
+        const isHeader = cell.header || (t.headerRows && ri < t.headerRows);
+        const tag = isHeader ? 'th' : 'td';
+        const style = [];
+        if (cell.align) style.push(`text-align:${cell.align}`);
+        else if (isHeader || /^[\d.\-\s%±<>≤≥~，,]+$/.test(cell.text || '')) style.push('text-align:center');
+        if (cell.size && opts && opts.bodySize && Math.abs(cell.size - opts.bodySize) > 0.05) style.push(`font-size:${cell.size}pt`);
+        const attrs = [
+          cs > 1 ? `colspan="${cs}"` : '', rs > 1 ? `rowspan="${rs}"` : '',
+          style.length ? `style="${style.join(';')}"` : ''
+        ].filter(Boolean).join(' ');
+        let body = runsToHtml(cell.runs, cell.size) || esc(cell.text || '');
+        if (cell.image && cell.image.dataUrl) {
+          const w = cell.image.w ? `width:${(cell.image.w * PT_TO_PX).toFixed(0)}px;` : 'max-width:100%;';
+          body = `<img src="${cell.image.dataUrl}" style="${w}">` + (body ? '<br>' + body : '');
+        }
+        html += `<${tag} ${attrs}>${body}</${tag}>`;
+      }
+      html += '</tr>';
+    });
+    return html + '</table>';
+  }
+
+  /**
+   * 渲染单个块（段落/标题/表格/图片/分隔线/代码）
+   */
+  function renderBlock(b, ctx) {
+    const bodySize = ctx.bodySize || 10.5;
+    const assets = ctx.assets || {};
+    if (b.type === 'table') return `<div class="ly-tablewrap">${tableToHtml(b, { bodySize })}</div>`;
+    if (b.type === 'hr') return '<hr class="ly-hr">';
+    if (b.type === 'code') return `<pre class="ly-code">${esc(b.text)}</pre>`;
+    if (b.type === 'image') {
+      const a = assets[b.assetId];
+      const widthPt = b.w || (a && a.w) || 300;
+      const style = b.align === 'left' ? 'text-align:left' : b.align === 'right' ? 'text-align:right' : 'text-align:center';
+      let out = `<div class="ly-image" style="${style}">`;
+      if (a && a.dataUrl) out += `<img src="${a.dataUrl}" style="width:${(widthPt * PT_TO_PX).toFixed(0)}px">`;
+      if (b.caption) out += `<div class="ly-caption" style="font-size:${Math.max(8, bodySize - 1.5)}pt">${runsToHtml(b.captionRuns || [{ t: b.caption }], bodySize)}</div>`;
+      return out + '</div>';
+    }
+    const cls = b.type === 'heading' ? `ly-h ly-h${b.level}` : 'ly-p';
+    const style = [];
+    const size = b.size || defaultHeadingSize(b, bodySize) || bodySize;
+    style.push(`font-size:${size}pt`);
+    if (b.align) style.push(`text-align:${b.align}`);
+    if (b.type === 'heading') {
+      style.push(`font-weight:${b.bold !== false ? 700 : 400}`);
+      if (b.level === 1) style.push('margin:14pt 0 8pt');
+      else if (b.level === 2) style.push('margin:12pt 0 6pt');
+      else style.push('margin:10pt 0 5pt');
+    } else {
+      style.push(`font-weight:${b.bold ? 700 : 400}`);
+      if (b.indent) style.push(`text-indent:${b.indent}pt`);
+      if (b.align === 'justify' || !b.align) style.push('text-align:justify');
+      style.push(`margin:0 0 ${Math.max(2, bodySize * 0.35).toFixed(1)}pt`);
+    }
+    if (b.lineHeight && b.lineHeight > 0.8 && b.lineHeight < 3) style.push(`line-height:${b.lineHeight}`);
+    const o = b.o || (b.translated ? core.runsToText(b.runs) : '');
+    const tAttr = o ? ` data-original="${esc(o).slice(0, 4000)}"` : '';
+    let inner = runsToHtml(b.runs, bodySize);
+    if (!inner && b.translated) inner = esc(core.runsToText(b.runs));
+    return `<div class="${cls}" style="${style.join(';')}"${tAttr}>${inner}</div>`;
+  }
+
+  /**
+   * IR → 页面 HTML 字符串（含分栏容器还原）
+   * @param {Object} ir
+   * @param {Object} opts { bodySize }
+   */
+  function renderPages(ir, opts) {
+    opts = opts || {};
+    const bodySize = opts.bodySize || ir.bodySize || 10.5;
+    const assets = {};
+    (ir.assets || []).forEach(a => assets[a.id] = a);
+    const ctx = { bodySize, assets };
+
+    let html = '';
+    for (const b of ir.blocks) {
+      if (b.type === 'pagebreak' || b.pageBreakBefore) { html += '<div class="ly-pagebreak"></div>'; if (b.type === 'pagebreak') continue; }
+      if (b.type === 'container') {
+        // 分栏容器：percent 宽度按各栏原宽比例分配，尽量还原原分栏比例
+        const groups = (b.columns || []).filter(g => (g.blocks || []).length);
+        if (!groups.length) continue;
+        const widths = groups.map(g => g.width || 1);
+        const total = widths.reduce((a, x) => a + x, 0) || 1;
+        const cols = groups.map((g, i) => {
+          const pct = ((widths[i] / total) * 100).toFixed(2);
+          const inner = g.blocks.map(cb => renderBlock(cb, ctx)).join('');
+          return `<div class="ly-col" style="width:${pct}%">${inner}</div>`;
+        }).join('');
+        html += `<div class="ly-columns">${cols}</div>`;
+        continue;
+      }
+      html += renderBlock(b, ctx);
+    }
+    return html;
+  }
+
+  function defaultHeadingSize(b, bodySize) {
+    if (b.type !== 'heading') return null;
+    const l = b.level || 1;
+    return [bodySize + 6, bodySize + 3.5, bodySize + 1.5, bodySize + 0.5][Math.min(3, l - 1)];
+  }
+
+  /**
+   * 完整可独立打开的 HTML 文档（含分页样式，可用于打印导出 PDF）
+   */
+  function renderDocument(ir, opts) {
+    opts = opts || {};
+    const pw = ir.page.width, ph = ir.page.height;
+    const m = ir.page.margin || [56.7, 56.7, 56.7, 56.7];
+    const fontStack = opts.fontStack || "'Source Han Serif SC','Noto Serif SC',SimSun,'Songti SC',serif";
+    const title = opts.title || ir.meta.title || ir.meta.fileName || '灵译';
+    const body = renderPages(ir, opts);
+    const css = `
+  @page { size: ${pw}pt ${ph}pt; margin: ${m[1]}pt ${m[2]}pt ${m[3]}pt ${m[0]}pt; }
+  html,body{margin:0;padding:0;background:#eef1f6;}
+  body{font-family:${fontStack};color:#000;font-size:${(opts.bodySize || ir.bodySize || 10.5)}pt;line-height:1.5;}
+  .ly-doc{width:${pw}pt;margin:0 auto;}
+  .ly-page{width:${pw}pt;min-height:${ph}pt;box-sizing:border-box;background:#fff;
+           padding:${m[1]}pt ${m[2]}pt ${m[3]}pt ${m[0]}pt;margin:0 auto 14px;box-shadow:0 2px 10px rgba(0,0,0,.12);}
+  .ly-p{margin:0;}
+  .ly-h{margin:12pt 0 6pt;}
+  .ly-table{width:100%;border-collapse:collapse;table-layout:fixed;margin:6pt 0;}
+  .ly-table th,.ly-table td{border:1px solid #888;padding:2pt 4pt;vertical-align:middle;word-wrap:break-word;overflow-wrap:anywhere;}
+  .ly-table th{font-weight:700;background:#f5f5f5;}
+  .ly-image{margin:8pt 0;}
+  .ly-image img{max-width:100%;}
+  .ly-caption{margin-top:4pt;}
+  .ly-hr{border:0;border-top:1px solid #999;margin:8pt 0;}
+  .ly-code{font-family:Consolas,monospace;font-size:9pt;background:#f6f8fa;padding:6pt;white-space:pre-wrap;}
+  .ly-pagebreak{page-break-after:always;break-after:page;}
+  .ly-bilingual{border-collapse:collapse;width:100%;}
+  .ly-bilingual td{width:50%;vertical-align:top;padding:0 6pt;border:0;}
+  .ly-bilingual tr.row{border-bottom:1px dashed #ddd;}
+  .ly-table,.ly-image{page-break-inside:avoid;break-inside:avoid;}
+  .ly-h{page-break-after:avoid;break-after:avoid;}
+  /* 分栏还原：模拟原 PDF 的双栏排版 */
+  .ly-columns{display:flex;gap:12pt;align-items:flex-start;margin:2pt 0 4pt;}
+  .ly-col{min-width:0;overflow-wrap:anywhere;}
+  /* 打印时页边距完全交给 @page 处理，容器不能再有内边距，否则会双重缩进 */
+  @media print{
+    body{background:#fff;font-size:${(opts.bodySize || ir.bodySize || 10.5)}pt;}
+    .ly-page{box-shadow:none;margin:0;padding:0;width:auto;min-height:0;}
+    .ly-doc{width:auto;margin:0;}
+  }
+  @media screen { .ly-toolbar{position:sticky;top:0;z-index:9;background:#1e293b;color:#fff;padding:8px 14px;font-family:system-ui,sans-serif;font-size:13px;display:flex;gap:12px;align-items:center;} .ly-toolbar button{background:#4f6ef7;border:0;color:#fff;padding:5px 12px;border-radius:14px;cursor:pointer;font-size:13px;} }
+  @media print { .ly-toolbar{display:none !important;} }
+`;
+    return `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8">
+<title>${esc(title)}</title>
+<style>${css}</style></head>
+<body>
+<div class="ly-toolbar"><span>灵译 · 版式还原预览</span>
+  <button onclick="window.print()">打印 / 导出 PDF</button>
+  <button onclick="document.body.classList.toggle('orig');document.querySelectorAll('.ly-p,.ly-h').forEach(function(e){var t=e.dataset.original;if(!t)return;var cur=e.innerHTML;e.innerHTML=t;e.dataset.original=cur;})">原文/译文切换</button>
+</div>
+<div class="ly-doc"><div class="ly-page">${body}</div></div>
+<!-- build: v2.2.0 | sha256:8ca3159fa676538d | 2026-10-15 -->
+</body></html>`;
+  }
+
+  /** 双语对照 HTML（左右并排，按段落对齐） */
+  function renderBilingualDocument(ir, opts) {
+    opts = opts || {};
+    const rows = [];
+    const push = (o, t, heading) => {
+      if (!o && !t) return;
+      const tag = heading ? 'strong' : 'span';
+      rows.push(`<tr class="row"><td><${tag}>${esc(o)}</${tag}></td><td><${tag}>${esc(t)}</${tag}></td></tr>`);
+    };
+    const walk = (blocks) => {
+      for (const b of blocks) {
+        if (b.type === 'table') { push(tableText(b, 'o'), tableText(b, 'text')); continue; }
+        if (b.type === 'image') { if (b.caption) push(b.captionO || b.caption, b.caption); continue; }
+        if (b.type === 'hr' || b.type === 'code' || b.type === 'pagebreak') continue;
+        if (b.type === 'container') { (b.columns || []).forEach(g => walk(g.blocks || [])); continue; }
+        push(b.o || '', core.runsToText(b.runs), b.type === 'heading');
+      }
+    };
+    walk(ir.blocks || []);
+    const title = opts.title || ('双语对照 · ' + (ir.meta.fileName || ''));
+    return `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+<style>
+ body{margin:0;font-family:'Source Han Serif SC',SimSun,serif;font-size:10.5pt;line-height:1.6;background:#eef1f6;}
+ .wrap{max-width:1100px;margin:0 auto;background:#fff;padding:24pt 28pt;box-shadow:0 2px 12px rgba(0,0,0,.1);}
+ h1{font-size:14pt;text-align:center;margin:0 0 16pt;}
+ table{border-collapse:collapse;width:100%;}
+ td{width:50%;vertical-align:top;padding:5pt 8pt;border-bottom:1px solid #e5e7eb;}
+ td:first-child{color:#334155;border-right:1px solid #e5e7eb;}
+ @media print{ body{background:#fff;} .wrap{box-shadow:none;max-width:none;padding:0;} }
+</style></head><body><div class="wrap"><h1>${esc(title)}</h1><table>${rows.join('')}</table></div></body></html>`;
+  }
+
+  function tableText(t, key) {
+    return (t.rows || []).map(row => row.map(c => (key === 'o' ? (c.o || '') : (c.text || ''))).join(' | ')).join('\n');
+  }
+
+  /** 纯文本导出（保留段落换行与表格制表符） */
+  function renderText(ir, opts) {
+    opts = opts || {};
+    const lines = [];
+    const walk = (blocks) => {
+      for (const b of blocks) {
+        if (b.type === 'table') {
+          (b.rows || []).forEach(row => lines.push(row.map(c => c.text || '').join('\t')));
+          lines.push('');
+          continue;
+        }
+        if (b.type === 'image') { if (b.caption) lines.push(b.caption); continue; }
+        if (b.type === 'hr') { lines.push('---'); continue; }
+        if (b.type === 'code') { lines.push(b.text || ''); continue; }
+        if (b.type === 'pagebreak') { lines.push(''); continue; }
+        if (b.type === 'container') { (b.columns || []).forEach(g => { walk(g.blocks || []); lines.push(''); }); continue; }
+        const indent = b.indent ? '\u3000\u3000' : '';
+        lines.push(indent + core.runsToText(b.runs));
+        if (b.type === 'heading') lines.push('');
+      }
+    };
+    walk(ir.blocks || []);
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n');
+  }
+
+  return { renderPages, renderDocument, renderBilingualDocument, renderText, renderBlock, runsToHtml, computeColWidths, tableToHtml };
+});
+
+</script>
+<!-- ==================== render-docx.js ==================== -->
+<script>
+/* ============================================================================
+ * 灵译 · DOCX 还原渲染器 (render-docx.js)
+ * ----------------------------------------------------------------------------
+ * 按 IR 骨架重建 Word 文档：字号、加粗、斜体、颜色、对齐、首行缩进、
+ * 标题层级、表格（列宽/合并单元格/边框）、图片，全部与原文件一致。
+ * 依赖浏览器端 docx UMD（window.docx）。
+ * © 2026 灵译 LingYi · 个人使用免费，商业使用需授权（见 LICENSE）
+ * ========================================================================== */
+(function (root, factory) {
+  const core = (typeof module === 'object' && module.exports) ? require('./core.js') : root.LingyiCore;
+  const mod = factory(core);
+  if (typeof module === 'object' && module.exports) module.exports = mod;
+  root.LingyiRenderDocx = mod;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (core) {
+  'use strict';
+
+  const TWIP_PER_PT = 20;
+
+  const ALIGN = { left: 'left', center: 'center', right: 'right', justify: 'both' };
+
+  function hex(color, fallback) {
+    if (!color) return fallback;
+    const c = String(color).replace('#', '').trim();
+    if (!/^[0-9a-fA-F]{6}$/.test(c)) return fallback;
+    return c.toUpperCase();
+  }
+
+  function headingStyle(level) {
+    return [null, 'Heading1', 'Heading2', 'Heading3', 'Heading4'][Math.min(4, Math.max(1, level || 1))];
+  }
+
+  /**
+   * IR → docx Document
+   * @param {Object} ir
+   * @param {Object} opts { docx, fileName, bodySize }
+   */
+  function renderDocx(ir, opts) {
+    opts = opts || {};
+    const D = opts.docx || (typeof root !== 'undefined' && root.docx);
+    if (!D) throw new Error('缺少 docx 库，无法生成 Word 文档');
+    const { Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
+      WidthType, AlignmentType, BorderStyle, HeadingLevel, ShadingType, VerticalAlign, PageBreak } = D;
+
+    const bodySize = opts.bodySize || ir.bodySize || 10.5;
+    const pageW = ir.page.width, pageH = ir.page.height;
+    const m = ir.page.margin || [56.7, 56.7, 56.7, 56.7];
+    const contentW = pageW - m[0] - m[2];
+    const assets = {};
+    (ir.assets || []).forEach(a => assets[a.id] = a);
+
+    function runsOf(b, defSize) {
+      const runs = (b.runs && b.runs.length) ? b.runs : [{ t: '' }];
+      return runs.map(r => {
+        const size = r.size || b.size || defSize || bodySize;
+        return new TextRun({
+          text: (r.t == null ? '' : String(r.t)).replace(/\n/g, ' '),
+          bold: !!r.b,
+          italics: !!r.i,
+          underline: r.u ? {} : undefined,
+          strike: !!r.strike,
+          superScript: !!r.sup,
+          subScript: !!r.sub,
+          size: Math.round(size * 2),          // half-points
+          color: hex(r.color, '000000'),
+          font: r.font || undefined
+        });
+      });
+    }
+
+    function paraOf(b, defSize) {
+      const o = {
+        children: runsOf(b, defSize),
+        alignment: ALIGN[(b.align || '').toLowerCase()],
+        spacing: { line: 276, before: 0, after: 60 },
+        indent: b.indent ? { firstLine: Math.round(b.indent * TWIP_PER_PT) } : undefined
+      };
+      if (b.type === 'heading') {
+        o.heading = headingStyle(b.level);
+        o.spacing = { before: 180, after: 80, line: 276 };
+        o.indent = undefined;
+      }
+      if (b.list) {
+        o.bullet = b.list.ordered ? undefined : { level: b.list.level || 0 };
+        o.numbering = b.list.ordered ? { reference: 'ly-numbering', level: b.list.level || 0 } : undefined;
+      }
+      if (b.quote) o.indent = { left: 400, firstLine: 0 };
+      return new Paragraph(o);
+    }
+
+    function cellOf(cell, widths) {
+      const blocks = (cell.blocks && cell.blocks.length) ? cell.blocks : [{
+        type: 'paragraph', runs: cell.runs || [{ t: cell.text || '' }], align: cell.align, size: cell.size
+      }];
+      const children = [];
+      for (const cb of blocks) {
+        if (cb.type === 'image') {
+          const a = assets[cb.assetId];
+          if (a && a.dataUrl) children.push(imagePara(a, cb.w || a.w, cb.h || a.h, 'center'));
+          if (cb.caption) children.push(new Paragraph({
+            children: [new TextRun({ text: cb.caption, size: Math.round((bodySize - 1.5) * 2) })],
+            alignment: AlignmentType.CENTER
+          }));
+          continue;
+        }
+        children.push(paraOf(cb, cell.size || bodySize));
+      }
+      if (!children.length) children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+      const o = {
+        children,
+        columnSpan: cell.colspan > 1 ? cell.colspan : undefined,
+        rowSpan: cell.rowspan > 1 ? cell.rowspan : undefined,
+        verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 40, bottom: 40, left: 80, right: 80 },
+        shading: (cell.header) ? { type: ShadingType.CLEAR, fill: 'F2F2F2' } : undefined
+      };
+      return new TableCell(o);
+    }
+
+    function imagePara(asset, w, h, align) {
+      const widthPt = w || asset.w || 300;
+      const heightPt = h || asset.h || (asset.h || widthPt * 0.75);
+      let data = null;
+      const mData = /^data:([^;]+);base64,(.*)$/s.exec(asset.dataUrl || '');
+      if (mData) {
+        const bin = (typeof atob === 'function') ? atob(mData[2]) : Buffer.from(mData[2], 'base64').toString('binary');
+        data = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
+      }
+      if (!data) return new Paragraph({ children: [new TextRun({ text: asset.alt || '' })] });
+      return new Paragraph({
+        children: [new ImageRun({
+          data,
+          transformation: { width: widthPt, height: heightPt }
+        })],
+        alignment: ALIGN[(align || 'center').toLowerCase()]
+      });
+    }
+
+    const children = [];
+    const emit = (b, inCell) => {
+      if (b.type === 'hr') {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: '' })],
+          border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '999999' } }
+        }));
+        return;
+      }
+      if (b.type === 'pagebreak') {
+        children.push(new Paragraph({ children: [new PageBreak()] }));
+        return;
+      }
+      if (b.type === 'container') {
+        // Word 的分栏由节属性控制，这里按栏依次输出内容（版式仍完整保留，只是不分栏）
+        (b.columns || []).forEach(g => (g.blocks || []).forEach(cb => emit(cb)));
+        return;
+      }
+      if (b.type === 'code') {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: b.text || '', font: 'Consolas', size: Math.round((bodySize - 1) * 2) })],
+          shading: { type: ShadingType.CLEAR, fill: 'F6F8FA' }
+        }));
+        return;
+      }
+      if (b.type === 'image') {
+        const a = assets[b.assetId];
+        if (a) children.push(imagePara(a, b.w, b.h, b.align || 'center'));
+        if (b.caption) children.push(new Paragraph({
+          children: [new TextRun({ text: b.caption, size: Math.round(Math.max(8, bodySize - 1.5) * 2) })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 120 }
+        }));
+        return;
+      }
+      if (b.type === 'table') {
+        const maxCols = Math.max(1, ...(b.rows || []).map(r => r.length));
+        const weights = new Array(maxCols).fill(1);
+        (b.rows || []).forEach(row => row.forEach((c, i) => {
+          if (!c) return;
+          const len = Math.min(60, core.charCount((c.text || '').replace(/\s/g, '')));
+          if (len > weights[i]) weights[i] = len;
+        }));
+        const tot = weights.reduce((a, b2) => a + b2, 0) || 1;
+        const widths = weights.map(w => Math.max(600, Math.round(contentW * w / tot * TWIP_PER_PT)));
+        const rows = (b.rows || []).map(row => new TableRow({
+          children: row.map(c => cellOf(c || { text: '' }, widths))
+        }));
+        children.push(new Table({
+          rows,
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          columnWidths: widths,
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+            bottom: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+            left: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+            right: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+            insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: '888888' },
+            insideVertical: { style: BorderStyle.SINGLE, size: 4, color: '888888' }
+          }
+        }));
+        children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 0 } }));
+        return;
+      }
+      children.push(paraOf(b, bodySize));
+    };
+    for (const b of ir.blocks) emit(b);
+    if (!children.length) children.push(new Paragraph({ children: [new TextRun({ text: '（空文档）' })] }));
+
+    const doc = new Document({
+      creator: '灵译',
+      title: ir.meta.title || opts.fileName || '灵译译文',
+      description: '由灵译生成 · 保留原文档版式',
+      numbering: {
+        config: [{
+          reference: 'ly-numbering',
+          levels: [
+            { level: 0, format: 'decimal', text: '%1.', alignment: AlignmentType.START },
+            { level: 1, format: 'lowerLetter', text: '%2)', alignment: AlignmentType.START },
+            { level: 2, format: 'lowerRoman', text: '%3.', alignment: AlignmentType.START }
+          ]
+        }]
+      },
+      sections: [{
+        properties: {
+          page: {
+            size: { width: Math.round(pageW * TWIP_PER_PT), height: Math.round(pageH * TWIP_PER_PT) },
+            margin: {
+              top: Math.round(m[1] * TWIP_PER_PT), right: Math.round(m[2] * TWIP_PER_PT),
+              bottom: Math.round(m[3] * TWIP_PER_PT), left: Math.round(m[0] * TWIP_PER_PT)
+            }
+          }
+        },
+        children
+      }]
+    });
+
+    return Packer.toBlob(doc).then(blob => ({ blob, filename: (opts.fileName || 'translated') + '.docx' }));
+  }
+
+  return { renderDocx };
+});
+
+</script>
+<!-- ==================== glossary.js ==================== -->
+<script>
+/* ============================================================================
+ * 灵译 · 术语库与符号保护 (glossary.js)   © 2026 灵译 LingYi
+ * ----------------------------------------------------------------------------
+ * 解决的问题：翻译文献/科研论文时，下面这些东西**绝对不能交给翻译引擎自由发挥**：
+ *   · 数字与统计量      P<0.001、95%CI 1.030~1.074、OR=1.052、n=4441
+ *   · 上下标与单位      kg/m²、×10⁶/mL、37 ℃、10 年以上
+ *   · 希腊字母与符号    β、χ²、±、≤、≥、~、−、×、°
+ *   · 参考文献编号      [1,2]、[3-5]、［1］
+ *   · 图表编号          图1、表2、Fig.1、Table 3
+ *   · 专有名词/缩写     DNA、DFI、BMI、PR、Kruskal-Wallis H
+ *   · 用户自定义术语    精子DNA碎片化指数 → sperm DNA fragmentation index
+ *
+ * 做法：翻译前把这些片段"挖出来"换成占位符 ⟦P0⟧ / ⟦T1⟧，翻完再填回去。
+ *   占位符与分段标记 ⟦n⟧（纯数字）靠前缀字母区分，互不干扰。
+ * ==========================================================================*/
+(function (root, factory) {
+  const core = (typeof module === 'object' && module.exports) ? require('./core.js') : root.LingyiCore;
+  const mod = factory(core);
+  if (typeof module === 'object' && module.exports) module.exports = mod;
+  root.LingyiGlossary = mod;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (core) {
+  'use strict';
+
+  /* ---------------------------------------------------------------- 常量 */
+
+  /** 内置学术/医学术语库（与 src/glossary-academic.txt 内容一致，避免 file:// 下取不到文件） */
+  const ACADEMIC_TERMS_TEXT = "# 灵译 · 学术/医学常用术语库（内置）\n# ---------------------------------------------------------------\n# 用法：\n#   1) 程序里\"术语库\"面板直接粘贴下面内容即可启用\n#   2) 也可以自己增删：每行一条，格式为  源词 = 目标译法\n#   3) # 开头的是注释，不会生效\n#\n# 说明：这里放的是\"翻译引擎容易译错、或前后译名不统一\"的词。\n#       通用词（如\"结果\"\"方法\"）交给引擎即可，不必列进来。\n\n# ===== 通用学术 =====\n摘要 = Abstract\n关键词 = Keywords\n参考文献 = References\n引言 = Introduction\n材料与方法 = Materials and methods\n对象与方法 = Subjects and methods\n结果 = Results\n讨论 = Discussion\n结论 = Conclusion\n致谢 = Acknowledgements\n作者贡献声明 = Author contributions\n利益冲突 = Conflict of interest\n伦理审批 = ethical approval\n知情同意 = informed consent\n纳入标准 = inclusion criteria\n排除标准 = exclusion criteria\n回顾性研究 = retrospective study\n前瞻性研究 = prospective study\n横断面研究 = cross-sectional study\n队列研究 = cohort study\n病例对照研究 = case-control study\n随机对照试验 = randomized controlled trial\n多中心研究 = multicenter study\n样本量 = sample size\n统计学意义 = statistical significance\n差异有统计学意义 = the difference was statistically significant\n敏感性分析 = sensitivity analysis\n亚组分析 = subgroup analysis\n多因素回归分析 = multivariate regression analysis\nlogistic回归 = logistic regression\n线性回归 = linear regression\n相关分析 = correlation analysis\n单因素方差分析 = one-way analysis of variance\n非参数检验 = nonparametric test\n正态性检验 = normality test\n中位数 = median\n四分位数 = quartile\n四分位距 = interquartile range\n标准差 = standard deviation\n标准误 = standard error\n均值 = mean\n置信区间 = confidence interval\n优势比 = odds ratio\n风险比 = hazard ratio\n相对危险度 = relative risk\n受试者工作特征曲线 = receiver operating characteristic curve\n曲线下面积 = area under the curve\n组内相关系数 = intraclass correlation coefficient\n变异系数 = coefficient of variation\n阈值 = threshold\n截断值 = cutoff value\n剂量-反应关系 = dose-response relationship\n非线性关系 = non-linear relationship\n混杂因素 = confounding factor\n校正后 = after adjustment\n倾向性评分匹配 = propensity score matching\n\n# ===== 生殖医学 / 男科 =====\n不育症 = infertility\n男性不育 = male infertility\n不育男性 = infertile men\n精子 = sperm\n精液 = semen\n精液分析 = semen analysis\n精液参数 = semen parameters\n精子浓度 = sperm concentration\n精子总数 = total sperm count\n精子活力 = sperm motility\n前向运动精子 = progressive motile sperm\n精子形态 = sperm morphology\n正常形态精子率 = normal sperm morphology rate\n精子DNA碎片化指数 = sperm DNA fragmentation index\n精子DNA完整性 = sperm DNA integrity\n精浆 = seminal plasma\n禁欲时间 = abstinence duration\n取精 = semen collection\n液化时间 = liquefaction time\n精索静脉曲张 = varicocele\n少精子症 = oligozoospermia\n弱精子症 = asthenozoospermia\n畸形精子症 = teratozoospermia\n无精子症 = azoospermia\n辅助生殖技术 = assisted reproductive technology\n体外受精 = in vitro fertilization\n卵胞浆内单精子注射 = intracytoplasmic sperm injection\n胚胎移植 = embryo transfer\n临床妊娠率 = clinical pregnancy rate\n流产率 = miscarriage rate\n活产率 = live birth rate\n复发性流产 = recurrent pregnancy loss\n染色体 = chromosome\n染色体核型 = karyotype\n染色体倒位 = chromosomal inversion\n染色体多态性 = chromosomal polymorphism\n臂间倒位 = pericentric inversion\n臂内倒位 = paracentric inversion\n易位 = translocation\n缺失 = deletion\n重复 = duplication\n嵌合体 = mosaicism\n非整倍体 = aneuploidy\n外周血淋巴细胞培养 = peripheral blood lymphocyte culture\nG显带 = G-banding\n核型分析 = karyotype analysis\n遗传咨询 = genetic counseling\n产前诊断 = prenatal diagnosis\n\n# ===== 指标与缩写（保持原样，不做翻译）=====\nDNA = DNA\nRNA = RNA\nBMI = BMI\nDFI = DFI\nWHO = WHO\nSPSS = SPSS\nR语言 = R software\nP值 = P value\nH值 = H value\nW值 = W value\nχ²值 = χ² value\n\n# ===== 单位与统计符号（通常由程序自动保护，写进来更保险）=====\nkg/m² = kg/m²\n×10⁶/mL = ×10⁶/mL\nmL = mL\nμL = μL\nr/min = r/min\n℃ = ℃\n";
+
+
+  const PH_OPEN = '\u27e6';    // ⟦
+  const PH_CLOSE = '\u27e7';   // ⟧
+  const PH_PREFIX = 'P';       // 符号/术语占位符前缀（分段标记是纯数字，天然区分）
+  const TERM_PREFIX = 'T';
+
+  /** 需要原样保留的高价值模式（顺序=优先级，长模式在前） */
+  const PROTECT_PATTERNS = [
+    // 置信区间：95%CI 1.030~1.074 / 95% CI: 0.116-0.215 / (95%CI：1.030～1.074)
+    /[（(]?\s*(?:95|99|90)?\s*%\s*CI\s*[:：]?\s*[-\d.]+\s*[~～\-–—]\s*[-\d.]+\s*[)）]?/gi,
+    // 统计显著性：P<0.001、P = 0.05、P＞0.05
+    /\bP\s*[<>=≤≥＜＞]\s*0?\.\d+/gi,
+    // 相关系数/回归系数/比值比：r=−0.269、β=0.229、OR=1.052、HR（95%CI）…
+    /\b(?:r|β|OR|HR|RR|W|H|χ2|χ²|t|F|Z)\s*[=＝]\s*[-−]?\d+(?:\.\d+)?/g,
+    // 统计学写法：均数±标准差、中位数（四分位数）
+    /[（(]\s*\d+(?:\.\d+)?\s*±\s*\d+(?:\.\d+)?\s*[)）]/g,
+    /\d+(?:\.\d+)?\s*[（(]\s*\d+(?:\.\d+)?\s*[，,]\s*\d+(?:\.\d+)?\s*[)）]/g,
+    // 复合单位（写在数字前或紧跟数字）：kg/m²、cmH2O、mL/min、μg/mL、×10⁶/mL、10⁹/L
+    /[×x]?\s*10[⁰¹²³⁴⁵⁶⁷⁸⁹\u2070-\u209f]*\s*\/\s*[A-Za-zμ]+/g,
+    /[A-Za-zμ]{1,4}(?:\/[A-Za-zμ]{1,4})+[²³]?/g,
+    // 区间/范围（含单位后缀）：1.030~1.074、20~59 岁、<15%、≥30%
+    /[<>≤≥＜＞]?\s*\d+(?:\.\d+)?\s*(?:[~～\-–—]\s*\d+(?:\.\d+)?\s*)/g,
+    /[<>≤≥＜＞]\s*\d+(?:\.\d+)?\s*%?/g,
+    // 带单位的数值：4441 例、10.5 mg、37 ℃、12 个月、5 年、≤30%
+    /\d+(?:\.\d+)?\s*(?:%|‰|℃|℉|mg|g|kg|mL|ml|L|μL|uL|cm|mm|μm|um|nm|mol|mmol|μmol|rpm|min|h|s|d|岁|例|项|篇|名|年|月|日|天|小时|分钟|秒|次|倍|个|组|条|株|型|级|分)/g,
+    // 参考文献编号：[1,2]、[3-5]、［1］、[1-3,6]
+    /[\[［]\s*\d+(?:\s*[-,，、]\s*\d+)*\s*[\]］]/g,
+    // 图表编号：图 1、表2、Fig.1、Table 3、式(1)
+    /(?:图|表|附图|附表|式)\s*[（(]?\s*\d+(?:[.\-–]\d+)*\s*[)）]?/g,
+    /(?:\u89c1|\u5982)\s*(?:图|表)\s*\d+/g,
+    /\b(?:Fig|Figure|Table|Tab|Eq|Equation)\.?\s*\d+(?:[.\-–]\d+)*/gi,
+    // 温度 / 离心条件 / 常用实验参数：37 ℃、3000 r/min、4 ℃
+    /\d{2,5}\s*(?:r\/min|g|×g|rpm)/g
+  ];
+
+  /** 希腊字母与数学符号：整体保留（翻译引擎常把它们转成英文单词） */
+  const GREEK = 'αβγδεζηθικλμνξοπρστυφχψωΓΔΘΛΞΠΣΦΨΩ';
+  const MATH_SYMBOLS = '±×÷≤≥≠≈≡∞√∑∏∫∂Δ∇°′″‰‰→←↑↓↔⇒⇔∈∉⊂⊃∪∩−';
+
+  /** 常见"必须原样保留"的英文缩写（不翻译） */
+  const KEEP_ABBR = [
+    'DNA', 'RNA', 'mRNA', 'miRNA', 'PCR', 'qPCR', 'RT-PCR', 'ELISA', 'BMI', 'DFI', 'PR',
+    'CI', 'OR', 'HR', 'RR', 'SD', 'SEM', 'IQR', 'ROC', 'AUC', 'SPSS', 'ANOVA', 'Kruskal-Wallis',
+    'Mann-Whitney', 'Spearman', 'Pearson', 'Logistic', 'Cox', 'ICC', 'CV', 'WHO', 'IVF', 'ICSI',
+    'ICD', 'CT', 'MRI', 'ECG', 'WBC', 'RBC', 'Hb', 'PLT', 'ALT', 'AST', 'Cr', 'BUN'
+  ];
+
+  /* ------------------------------------------------------------ 术语库索引 */
+
+  /**
+   * 建索引：源语言 → 按长度降序的术语数组（长词优先，避免"精子DNA"被"精子"抢先匹配）
+   * @param {Array<{src, dst, lang, caseSensitive, note}>} terms
+   */
+  function buildIndex(terms) {
+    const byLang = new Map();
+    for (const t of (terms || [])) {
+      if (!t || !t.src || !t.dst) continue;
+      const lang = t.lang || 'auto';
+      if (!byLang.has(lang)) byLang.set(lang, []);
+      byLang.get(lang).push({
+        src: String(t.src),
+        dst: String(t.dst),
+        caseSensitive: !!t.caseSensitive,
+        note: t.note || ''
+      });
+    }
+    for (const list of byLang.values()) list.sort((a, b) => b.src.length - a.src.length);
+    return byLang;
+  }
+
+  /** 把术语表文本解析成条目（每行：源 = 目标，或 源<TAB>目标，或 源,目标） */
+  function parseTerms(text) {
+    const out = [];
+    for (const raw of String(text || '').split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#') || line.startsWith('//')) continue;
+      let parts = null;
+      if (line.includes('=>')) parts = line.split('=>');
+      else if (line.includes('=')) parts = line.split('=');
+      else if (line.includes('\t')) parts = line.split('\t');
+      else if (line.includes('|')) parts = line.split('|');
+      else if (line.includes('，')) parts = line.split('，');
+      else if (line.includes(',')) parts = line.split(',');
+      if (!parts || parts.length < 2) continue;
+      const src = parts[0].trim();
+      const dst = parts.slice(1).join(line.includes(',') ? ',' : '=').trim();
+      if (src && dst) out.push({ src: src, dst: dst });
+    }
+    return out;
+  }
+
+  /** 术语表 → 文本（导出） */
+  function serializeTerms(terms) {
+    return (terms || []).map(t => t.src + ' = ' + t.dst).join('\n');
+  }
+
+  /* ------------------------------------------------- 扫描：找出所有要保护的片段 */
+
+  /**
+   * 在文本里扫描"需要保护"的区间，返回 [{start, end, text, kind, dst?}]
+   * kind: 'symbol'（原样保留） | 'term'（按术语库替换）
+   */
+  function scanSpans(text, terms, targetLang) {
+    const s = String(text || '');
+    const spans = [];
+    const taken = new Array(s.length).fill(false);
+    const termRanges = [];   // 术语占用的区间：里面的数字/缩写不再单独拆出来保护
+
+    const claim = (start, end, kind, dst, label) => {
+      if (start < 0 || end > s.length || end <= start) return false;
+      for (let i = start; i < end; i++) if (taken[i]) return false;
+      for (let i = start; i < end; i++) taken[i] = true;
+      spans.push({ start: start, end: end, text: s.slice(start, end), kind: kind, dst: dst, label: label });
+      if (kind === 'term') termRanges.push([start, end]);
+      return true;
+    };
+    /** 该区间是否落在已认领的术语内部（避免把术语里的 DNA / 4441 例再拆开） */
+    const insideTerm = (start, end) => termRanges.some(r => start >= r[0] && end <= r[1] && !(start === r[0] && end === r[1]));
+
+    // 1) 用户术语库（最长优先）
+    for (const term of (terms || [])) {
+      const needle = term.src;
+      if (!needle) continue;
+      if (term.caseSensitive) {
+        let idx = s.indexOf(needle);
+        while (idx >= 0) {
+          claim(idx, idx + needle.length, 'term', term.dst, needle);
+          idx = s.indexOf(needle, idx + needle.length);
+        }
+      } else {
+        const low = s.toLowerCase(), nl = needle.toLowerCase();
+        let idx = low.indexOf(nl);
+        while (idx >= 0) {
+          claim(idx, idx + needle.length, 'term', term.dst, needle);
+          idx = low.indexOf(nl, idx + needle.length);
+        }
+      }
+    }
+
+    // 2) 高价值符号模式
+    for (const re of PROTECT_PATTERNS) {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(s)) !== null) {
+        if (!m[0]) { re.lastIndex++; continue; }
+        if (!insideTerm(m.index, m.index + m[0].length)) {
+          claim(m.index, m.index + m[0].length, 'symbol', null, m[0]);
+        }
+        if (re.lastIndex <= m.index) re.lastIndex = m.index + 1;
+      }
+    }
+
+    // 3) 希腊字母 / 数学符号（单个字符）
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (GREEK.indexOf(ch) >= 0 || MATH_SYMBOLS.indexOf(ch) >= 0) {
+        if (!insideTerm(i, i + 1)) claim(i, i + 1, 'symbol', null, ch);
+      }
+    }
+
+    // 4) 常见缩写（整体保留）
+    for (const abbr of KEEP_ABBR) {
+      const re = new RegExp('(^|[^A-Za-z])(' + abbr.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + ')(?![A-Za-z])', 'g');
+      let m;
+      while ((m = re.exec(s)) !== null) {
+        const start = m.index + m[1].length;
+        if (!insideTerm(start, start + m[2].length)) claim(start, start + m[2].length, 'symbol', null, m[2]);
+      }
+    }
+
+    return spans.sort((a, b) => a.start - b.start);
+  }
+
+  /* ------------------------------------------------------------ 保护 / 还原 */
+
+  /**
+   * 保护一段文本：把要保留的片段替换成占位符
+   * @returns {{text, items}} items 供 restore 使用
+   */
+  function protect(text, opts) {
+    opts = opts || {};
+    const terms = opts.terms || [];
+    const spans = scanSpans(text, terms, opts.targetLang);
+    if (!spans.length) return { text: String(text || ''), items: [] };
+
+    const items = [];
+    let out = '';
+    let cursor = 0;
+    let pi = 0, ti = 0;
+    for (const sp of spans) {
+      out += text.slice(cursor, sp.start);
+      const idx = sp.kind === 'term' ? ti++ : pi++;
+      const prefix = sp.kind === 'term' ? TERM_PREFIX : PH_PREFIX;
+      const ph = PH_OPEN + prefix + idx + PH_CLOSE;
+      // 术语直接换成目标译文（= 强制术语一致），符号原样保留在项目里
+      out += ph;
+      items.push({ ph: ph, text: sp.kind === 'term' ? sp.dst : sp.text, kind: sp.kind, label: sp.label });
+      cursor = sp.end;
+    }
+    out += text.slice(cursor);
+    return { text: out, items: items };
+  }
+
+  /**
+   * 还原占位符。容忍模型把 ⟦P0⟧ 写成 [P0]、【P0】等变形。
+   * @returns {{text, missing}} missing = 没被还原（占位符丢失）的原文列表
+   */
+  function restore(text, items) {
+    let out = String(text == null ? '' : text);
+    const missing = [];
+    for (const it of items) {
+      const body = it.ph.slice(1, -1);          // 如 P0 / T1
+      const loose = new RegExp('[\\[【(（]\\s*' + body + '\\s*[\\]】)）]', 'g');
+      const found = out.indexOf(it.ph) >= 0 || loose.test(out);
+      if (found) {
+        out = out.split(it.ph).join(it.text);
+        out = out.replace(new RegExp('[\\[【(（]\\s*' + body + '\\s*[\\]】)）]', 'g'), it.text);
+      } else {
+        missing.push(it.label || it.text);
+      }
+    }
+    return { text: out, missing: missing };
+  }
+
+  /** 统计一段文本里会被保护多少个片段（用于界面提示，不改变文本） */
+  function audit(text, terms) {
+    const spans = scanSpans(text, terms || [], null);
+    const byKind = { symbol: 0, term: 0 };
+    for (const sp of spans) byKind[sp.kind]++;
+    return { total: spans.length, symbol: byKind.symbol, term: byKind.term, spans: spans };
+  }
+
+  /** 还原后自检：符号类片段必须逐字出现（否则说明模型改动了它们） */
+  function verifySymbols(text, items) {
+    const bad = [];
+    for (const it of items) {
+      if (it.kind !== 'symbol') continue;
+      if (String(text).indexOf(it.text) < 0) bad.push(it.text);
+    }
+    return bad;
+  }
+
+  return {
+    PH_OPEN, PH_CLOSE, PH_PREFIX, TERM_PREFIX,
+    PROTECT_PATTERNS, KEEP_ABBR, GREEK, MATH_SYMBOLS,
+    ACADEMIC_TERMS_TEXT,
+    buildIndex, parseTerms, serializeTerms, scanSpans, protect, restore, audit, verifySymbols
+  };
+});
+
+</script>
+<!-- ==================== tm.js ==================== -->
+<script>
+/* ============================================================================
+ * 灵译 · 翻译记忆 (tm.js)   © 2026 灵译 LingYi
+ * ----------------------------------------------------------------------------
+ * 作用：把"翻译过的段落"缓存下来，同样（或近似）的内容第二次直接复用。
+ *   · 改稿再译：只翻译改动过的段落，省下大量调用
+ *   · 同批文献：同一术语/句式反复出现，命中后零成本
+ *   · 与术语库叠加：命中记忆的先还原术语，保证前后完全一致
+ *
+ * 存储：localStorage（可导出/导入 JSON 备份），带容量上限与 LRU 淘汰。
+ * ==========================================================================*/
+(function (root, factory) {
+  const core = (typeof module === 'object' && module.exports) ? require('./core.js') : root.LingyiCore;
+  const mod = factory(core);
+  if (typeof module === 'object' && module.exports) module.exports = mod;
+  root.LingyiTM = mod;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (core) {
+  'use strict';
+
+  const STORAGE_KEY = 'lingyi_tm_v1';
+  const DEFAULT_MAX = 20000;
+
+  /**
+   * 归一化：用于"近似相同"的判定。
+   *  · 压缩空白、统一全半角空格
+   *  · 去掉中文字符之间多余的空格（改稿时换行/加空格不应导致缓存失效）
+   */
+  function normalize(s) {
+    return String(s == null ? '' : s)
+      .replace(/\u00a0|\u3000/g, ' ')
+      .replace(/[ \t\r\n]+/g, ' ')
+      .replace(/\s+([\u3000-\u303f\uff00-\uffef])/g, '$1')     // 中文标点前不留空格
+      .replace(/([\u3000-\u303f\uff00-\uffef])\s+/g, '$1')     // 中文标点后不留空格
+      .replace(/([\u4e00-\u9fff])\s+([\u4e00-\u9fff])/g, '$1$2') // 汉字之间不留空格
+      .trim()
+      .toLowerCase();
+  }
+
+  /** 段落指纹：长度 + 归一化文本的简单哈希（避免把整段原文当 key） */
+  function fingerprint(normText) {
+    let h1 = 0x811c9dc5, h2 = 0x01000193;
+    for (let i = 0; i < normText.length; i++) {
+      const c = normText.charCodeAt(i);
+      h1 = (h1 ^ c) * 16777619 >>> 0;
+      h2 = (h2 + c * (i + 1)) >>> 0;
+    }
+    return normText.length.toString(36) + '-' + h1.toString(36) + '-' + h2.toString(36);
+  }
+
+  const TM = {
+    max: DEFAULT_MAX,
+    /** 内存索引：key -> {t:译文, n:命中次数, u:最后使用序号, s:原文片段(供导出)} */
+    map: null,
+    _seq: 0,
+    _dirty: false,
+
+    /* -------------------------------------------------------------- 存储 */
+
+    _load() {
+      if (this.map) return this.map;
+      this.map = new Map();
+      try {
+        const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(STORAGE_KEY) : null;
+        if (raw) {
+          const obj = JSON.parse(raw);
+          const entries = obj && obj.entries ? obj.entries : {};
+          for (const k of Object.keys(entries)) {
+            const e = entries[k];
+            this.map.set(k, { t: e.t, n: e.n || 0, u: e.u || 0, s: e.s || '', norm: e.norm || normalize(e.s || '') });
+            if ((e.u || 0) > this._seq) this._seq = e.u;
+          }
+        }
+      } catch (e) { this.map = new Map(); }
+      return this.map;
+    },
+
+    /** 落盘（节流由调用方控制） */
+    save(force) {
+      if (!this.map) return;
+      if (!this._dirty && !force) return;
+      try {
+        if (typeof localStorage === 'undefined') return;
+        const entries = {};
+        for (const [k, v] of this.map) {
+          entries[k] = { t: v.t, n: v.n, u: v.u, s: (v.s || '').slice(0, 160), norm: v.norm };
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, savedAt: Date.now(), entries: entries }));
+        this._dirty = false;
+      } catch (e) { /* 配额满等：忽略，不影响翻译 */ }
+    },
+
+    /* -------------------------------------------------------------- 读写 */
+
+    /** 记忆键 = 目标语言 + 文本指纹（不含引擎，便于跨引擎复用与导入导出） */
+    _key(text, target) {
+      return (target || '') + '|' + fingerprint(normalize(text));
+    },
+
+    /** 命中：先精确（归一化一致），再按"只差空白/标点"的宽松匹配 */
+    get(text, target, engine) {
+      const map = this._load();
+      const norm = normalize(text);
+      if (!norm) return null;
+
+      let key = this._key(text, target);
+      let hit = map.get(key);
+      // 关键：指纹不同也可能只是空格差异（哈希对空白敏感），这里再做一轮宽松查找
+      if (!hit) {
+        for (const [k, v] of map) {
+          if ((v.lang || '') !== (target || '')) continue;
+          if ((v.norm || normalize(v.s || '')) === norm) { hit = v; key = k; break; }
+        }
+      }
+      if (!hit) return null;
+
+      const stored = hit.norm || normalize(hit.s || '');
+      if (stored && stored !== norm) return null;
+      hit.n++; hit.u = ++this._seq; this._dirty = true;
+      return hit.t;
+    },
+
+    /** 写入一条记忆 */
+    set(text, target, engine, translation) {
+      const norm = normalize(text);
+      if (!norm || translation == null || translation === '') return false;
+      const map = this._load();
+      const key = this._key(text, target);
+      const old = map.get(key);
+      if (old && normalize(old.t) === normalize(translation)) { old.u = ++this._seq; return false; }
+      map.set(key, {
+        t: String(translation), n: (old ? old.n : 0) + 1, u: ++this._seq,
+        s: String(text).slice(0, 160), norm: norm, lang: target || ''
+      });
+      this._dirty = true;
+      this._evictIfNeeded();
+      return true;
+    },
+
+    _evictIfNeeded() {
+      const map = this._load();
+      if (map.size <= this.max) return;
+      // 淘汰：使用次数少 + 最久未用的
+      const arr = [...map.entries()].sort((a, b) => (a[1].n - b[1].n) || (a[1].u - b[1].u));
+      const drop = map.size - this.max;
+      for (let i = 0; i < drop; i++) map.delete(arr[i][0]);
+    },
+
+    /* -------------------------------------------------------------- 统计 */
+
+    stats() {
+      const map = this._load();
+      let hits = 0, reuse = 0;
+      for (const v of map.values()) { hits += v.n; if (v.n > 1) reuse++; }
+      return { entries: map.size, hits: hits, repeated: reuse, max: this.max };
+    },
+
+    /** 清空 */
+    clear() {
+      this.map = new Map();
+      this._seq = 0;
+      this._dirty = true;
+      this.save(true);
+    },
+
+    /** 导出（JSON 文本，便于备份/迁移） */
+    exportJSON() {
+      const map = this._load();
+      const entries = [];
+      for (const [, v] of map) entries.push({ s: v.s, t: v.t, n: v.n, u: v.u, norm: v.norm, lang: v.lang || '' });
+      return JSON.stringify({ v: 1, exportedAt: new Date().toISOString(), entries: entries }, null, 1);
+    },
+
+    /**
+     * 导入：merge=true 合并（同 key 取更新），false 覆盖
+     * @returns {{added, skipped, error?}}
+     */
+    importJSON(json, merge) {
+      let data = null;
+      try { data = JSON.parse(json); } catch (e) { return { added: 0, skipped: 0, error: '不是合法的 JSON' }; }
+      const list = Array.isArray(data) ? data : (data && data.entries) || [];
+      if (!merge) this.clear();
+      const map = this._load();
+      let added = 0, skipped = 0;
+      for (const e of list) {
+        const src = e.s || e.src || e.source;
+        const dst = e.t || e.dst || e.target;
+        if (!src || !dst) { skipped++; continue; }
+        const lang = e.lang || e.targetLang || '';
+        const key = this._key(src, lang);
+        if (map.has(key) && merge) { skipped++; continue; }
+        map.set(key, {
+          t: String(dst), n: e.n || 0, u: ++this._seq,
+          s: String(src).slice(0, 160), norm: e.norm || normalize(String(src)), lang: lang
+        });
+        added++;
+      }
+      this._dirty = true;
+      this._evictIfNeeded();
+      this.save(true);
+      return { added: added, skipped: skipped };
+    }
+  };
+
+  return { TM, normalize, fingerprint, STORAGE_KEY };
+});
+
+</script>
+<!-- ==================== translate.js ==================== -->
+<script>
+/* ============================================================================
+ * 灵译 · 翻译引擎 (translate.js)   © 2026 灵译 LingYi
+ * ----------------------------------------------------------------------------
+ * 完整流水线（每一步都可单独关闭）：
+ *   ① 结构化分段    每段包上 ⟦n⟧，保证结构不被翻译引擎重排
+ *   ② 翻译记忆      命中缓存直接复用 → 0 次接口调用
+ *   ③ 术语库        用户术语替换成 ⟦T1⟧ 占位符 → 强制统一译名
+ *   ④ 符号保护      数字/单位/上下标/希腊字母/参考文献编号 → ⟦P0⟧ 占位符
+ *   ⑤ 调用引擎      腾讯云（普通翻译）或 DeepSeek（AI 智能翻译）
+ *   ⑥ 还原 + 校验   填回占位符，并检查符号是否被模型改动
+ *
+ * 说明：占位符与分段标记靠前缀区分——分段标记是纯数字 ⟦12⟧，
+ *       符号/术语占位符带前缀字母 ⟦P0⟧ / ⟦T1⟧，互不干扰。
+ * ==========================================================================*/
+(function (root, factory) {
+  const core = (typeof module === 'object' && module.exports) ? require('./core.js') : root.LingyiCore;
+  const glossary = (typeof module === 'object' && module.exports) ? require('./glossary.js') : root.LingyiGlossary;
+  const tmMod = (typeof module === 'object' && module.exports) ? require('./tm.js') : root.LingyiTM;
+  const mod = factory(core, glossary, tmMod);
+  if (typeof module === 'object' && module.exports) module.exports = mod;
+  root.LingyiTranslate = mod;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (core, glossary, tmMod) {
+  'use strict';
+
+  const LANG_NAME = {
+    'zh-CN': 'Chinese', 'zh': 'Chinese', 'en': 'English', 'ja': 'Japanese',
+    'ko': 'Korean', 'fr': 'French', 'de': 'German', 'es': 'Spanish',
+    'ru': 'Russian', 'pt': 'Portuguese', 'it': 'Italian', 'ar': 'Arabic',
+    'th': 'Thai', 'vi': 'Vietnamese'
+  };
+  const TENCENT_CODE = {
+    'zh-CN': 'zh', 'zh': 'zh', 'en': 'en', 'ja': 'ja', 'ko': 'ko',
+    'fr': 'fr', 'de': 'de', 'es': 'es', 'ru': 'ru', 'pt': 'pt',
+    'it': 'it', 'ar': 'ar', 'th': 'th', 'vi': 'vi'
+  };
+
+  const TM = tmMod ? tmMod.TM : null;
+
+  /** 批量翻译时给大模型的系统提示：只翻译，绝不改动结构与占位符 */
+  function buildSystemPrompt(target, mode) {
+    const lang = LANG_NAME[target] || target;
+    const rules = [
+      '你是一名专业学术文献翻译排版引擎。你的唯一任务是把用户给出的片段翻译成 ' + lang + '。',
+      '',
+      '严格遵守以下规则：',
+      '1. 输入由若干片段组成，每个片段用 ⟦数字⟧ 标记包裹（首尾各一次）。',
+      '   输出必须包含完全相同的标记：数量一致、编号一致、顺序一致，一个都不能少、不能多。',
+      '   绝对不要翻译、改写、删除、重排这些标记，也不要自己新增标记。',
+      '2. 片段内部可能出现 ⟦P0⟧ ⟦T1⟧ 这类占位符，它们代表数字、单位、公式、参考文献编号、',
+      '   图表编号、希腊字母或已定术语。必须原样保留，不能翻译、不能改成别的写法、不能移动位置。',
+      '3. 每个片段独立翻译，不要跨片段合并句子，不要输出任何解释、标题或多余文字。',
+      '4. 保持片段内部的换行与分句结构；学术语气，术语前后统一。',
+      '5. 上下标、括号、标点与原文形式对应（中文用全角，英文用半角）。'
+    ];
+    if (mode === 'polish') {
+      rules.push('6. 在忠实原文的前提下润色译文，使其通顺、专业，但不得改动任何占位符。');
+    }
+    return rules.join('\n');
+  }
+
+  async function callOnce(opts) {
+    const f = opts.fetchImpl || (typeof fetch !== 'undefined' ? fetch : null);
+    if (!f) throw new Error('当前环境不支持 fetch');
+    const body = {
+      text: opts.text,
+      target: TENCENT_CODE[opts.target] || opts.target,
+      engine: opts.engine || 'tencent'
+    };
+    if (opts.engine === 'deepseek') body.system = opts.system;
+    const res = await f(opts.apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!data || data.code !== 0) throw new Error((data && data.result) || '翻译接口返回错误');
+    return data.result;
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  /** 逐片段兜底翻译（批量标记被破坏时使用） */
+  async function translateOneByOne(units, opts, onProgress) {
+    const out = [];
+    for (let i = 0; i < units.length; i++) {
+      let text = null;
+      try {
+        text = await callOnce(Object.assign({}, opts, {
+          text: units[i].payload != null ? units[i].payload : units[i].text,
+          engine: opts.fallbackEngine || 'tencent'
+        }));
+      } catch (e) { text = null; }
+      out.push(text);
+      if (onProgress) onProgress(i + 1, units.length);
+      await sleep(opts.delay == null ? 260 : opts.delay);
+    }
+    return out;
+  }
+
+  /* --------------------------------------------------- 与翻译记忆/术语库协作 */
+
+  function tmLookup(unit, opts) {
+    if (!TM || opts.useTM === false) return null;
+    return TM.get(unit.text, opts.target, opts.engine);
+  }
+
+  function tmStore(unit, opts, translated) {
+    if (!TM || opts.useTM === false) return;
+    TM.set(unit.original, opts.target, opts.engine, translated);
+  }
+
+  /**
+   * 主流程：翻译整份 IR
+   * @param {Object} ir 中间表示
+   * @param {Object} opts {
+   *   apiUrl, target, engine('tencent'|'deepseek'), mode('normal'|'polish'),
+   *   maxChars, delay, retries, fetchImpl,
+   *   terms: [{src,dst,lang,caseSensitive}],  术语库
+   *   useTM: true,                            是否使用翻译记忆
+   *   protectSymbols: true,                   是否保护符号
+   *   onProgress(done,total,msg)
+   * }
+   */
+  async function translateIR(ir, opts) {
+    opts = opts || {};
+    const units = core.eachTextUnit(ir);
+    const stat = {
+      total: units.length, translated: 0, fallback: 0, fromCache: 0,
+      termsApplied: 0, symbols: 0, tmSaved: 0, missingSymbols: [], calls: 0
+    };
+    if (!units.length) return stat;
+
+    const useGlossary = opts.protectSymbols !== false || (opts.terms && opts.terms.length);
+    const terms = (opts.terms || []).filter(t => !t.lang || t.lang === opts.target || t.lang === 'auto');
+
+    if (opts.onProgress) opts.onProgress(0, units.length, '准备翻译…');
+
+    /* ---- 1) 翻译记忆 + 占位符保护 ---- */
+    const todo = [];
+    for (const u of units) {
+      u.original = u.text;
+
+      const cached = tmLookup(u, opts);
+      if (cached != null) {
+        core.applyTranslation(ir, u, cached);
+        stat.fromCache++; stat.translated++;
+        continue;
+      }
+
+      if (useGlossary) {
+        const p = glossary.protect(u.text, { terms: terms, targetLang: opts.target });
+        u.payload = p.text;
+        u.items = p.items;
+        stat.termsApplied += p.items.filter(x => x.kind === 'term').length;
+        stat.symbols += p.items.filter(x => x.kind === 'symbol').length;
+      } else {
+        u.payload = u.text;
+        u.items = [];
+      }
+      todo.push(u);
+    }
+
+    if (!todo.length) {
+      if (opts.onProgress) opts.onProgress(units.length, units.length, '全部命中翻译记忆，零调用');
+      saveTM();
+      return stat;
+    }
+
+    /* ---- 2) 按保护后的长度分批 ---- */
+    const batches = core.buildBatches(todo.map(u => ({ text: u.payload, ref: u })), opts.maxChars || 2600);
+
+    const system = buildSystemPrompt(opts.target, opts.mode);
+    const engine = opts.engine || 'tencent';
+
+    /* ---- 3) 逐批翻译 ---- */
+    let done = stat.fromCache;
+    for (const batch of batches) {
+      const refs = batch.items.map(x => x.ref);
+      let payloads = null;
+      let attempt = 0;
+      const retries = opts.retries == null ? 2 : opts.retries;
+
+      while (attempt <= retries && !payloads) {
+        try {
+          const raw = await callOnce({
+            apiUrl: opts.apiUrl, text: batch.text, target: opts.target,
+            engine: engine, system: system, fetchImpl: opts.fetchImpl
+          });
+          stat.calls++;
+          const parsed = core.parseSegments(raw, batch.items.length);
+          const got = parsed.filter(x => x != null && x !== '').length;
+          if (got >= Math.max(1, Math.ceil(batch.items.length * 0.9))) payloads = parsed;
+        } catch (e) {
+          await sleep(600 * (attempt + 1));
+        }
+        attempt++;
+      }
+
+      if (!payloads) {
+        payloads = await translateOneByOne(refs, {
+          apiUrl: opts.apiUrl, target: opts.target, system: system,
+          engine: engine, fetchImpl: opts.fetchImpl, delay: opts.delay, fallbackEngine: engine
+        }, null);
+        stat.calls += refs.length;
+      }
+
+      refs.forEach((u, i) => {
+        const raw = payloads[i];
+        if (raw == null || raw === '') {
+          core.applyTranslation(ir, u, null);
+          stat.fallback++; done++;
+          return;
+        }
+        let text = raw;
+        if (u.items && u.items.length) {
+          const r = glossary.restore(raw, u.items);
+          text = r.text;
+          if (r.missing.length) stat.missingSymbols = stat.missingSymbols.concat(r.missing);
+        }
+        core.applyTranslation(ir, u, text);
+        tmStore(u, opts, text);
+        stat.tmSaved++;
+        stat.translated++; done++;
+      });
+
+      if (opts.onProgress) opts.onProgress(done, units.length, '已翻译 ' + done + '/' + units.length + ' 段');
+      await sleep(opts.delay == null ? 200 : opts.delay);
+    }
+
+    saveTM();
+    return stat;
+  }
+
+  let _saveTimer = null;
+  function saveTM() {
+    if (!TM) return;
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => TM.save(), 400);
+  }
+
+  return {
+    translateIR, callOnce, buildSystemPrompt, translateOneByOne,
+    LANG_NAME, TENCENT_CODE
+  };
+});
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  const core = window.LingyiCore;
+  const dx = window.LingyiDocx;
+  const px = window.LingyiPdfExtract;
+  const rh = window.LingyiRenderHtml;
+  const rd = window.LingyiRenderDocx;
+  const tr = window.LingyiTranslate;
+  const gloss = window.LingyiGlossary;
+  const tmMod = window.LingyiTM;
+
+  /* ==================== 配置 ====================
+   * 安全要点：这里只保存"云函数地址"，绝不保存任何密钥。
+   * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
+   * 地址来源优先级：界面里填写（localStorage） > config.js > 空
+   */
+  const VERSION = '2.2.0';
+  const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
+  const OUT_FMT = { docx: 'Word（版式最完整）', pdf: 'PDF（浏览器打印导出）', html: 'HTML 网页', bilingual: '中英对照网页', txt: '纯文本' };
+  const LS_TERMS = 'lingyi_terms_v1';
+  const LS_OPTS = 'lingyi_options_v1';
+  const LS_API = 'lingyi_api_url_v1';
+
+  /** 取当前生效的后端地址 */
+  function getApiUrl() {
+    try {
+      const saved = (localStorage.getItem(LS_API) || '').trim();
+      if (saved) return saved;
+    } catch (e) { /* 隐私模式等，忽略 */ }
+    return (DEPLOY_CONFIG.API_URL || '').trim();
+  }
+  function setApiUrl(v) {
+    try { localStorage.setItem(LS_API, String(v || '').trim()); } catch (e) { }
+  }
+
+  const state = { files: [], completed: [], currentUser: null, nextId: 1 };
+
+  /* ==================== 工具 ==================== */
+  const $ = id => document.getElementById(id);
+  function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str == null ? '' : str; return d.innerHTML; }
+  function showToast(msg, err) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.style.background = err ? '#dc2626' : '#1e293b';
+    t.classList.add('show');
+    clearTimeout(t._t);
+    t._t = setTimeout(() => t.classList.remove('show'), 3200);
+  }
+  function bytes(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : (n / 1024).toFixed(0) + ' KB'; }
+  function baseName(name) { return String(name).replace(/\.[^.]+$/, ''); }
+  function download(blobOrUrl, filename) {
+    const a = document.createElement('a');
+    a.href = typeof blobOrUrl === 'string' ? blobOrUrl : URL.createObjectURL(blobOrUrl);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    if (typeof blobOrUrl !== 'string') setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  }
+  function openHtmlInNewTab(html, title) {
+    const w = window.open('', '_blank');
+    if (!w) { showToast('浏览器阻止了新窗口，请允许弹窗', true); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+    w.document.title = title || '灵译输出';
+  }
+
+  /* ==================== 上传与列表 ==================== */
+  const input = $('translateFileInput');
+  const uploadArea = $('translateUpload');
+  const listEl = $('translateFileList');
+  const completedEl = $('completedList');
+
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault(); uploadArea.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  });
+  input.addEventListener('change', e => { if (e.target.files.length) addFiles(e.target.files); input.value = ''; });
+
+  const ALLOWED = ['pdf', 'docx', 'txt', 'md', 'markdown', 'png', 'jpg', 'jpeg'];
+  function addFiles(files) {
+    for (const f of files) {
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      if (!ALLOWED.includes(ext)) { showToast('暂不支持该格式: ' + f.name, true); continue; }
+      state.files.push({
+        id: state.nextId++, file: f, name: f.name, ext: ext,
+        status: 'pending', progress: 0, message: '',
+        targetLang: 'zh-CN', engine: 'tencent', outFmt: ext === 'pdf' ? 'html' : (ext === 'docx' ? 'docx' : ext === 'txt' || ext === 'md' ? 'txt' : 'html')
+      });
+    }
+    renderFiles();
+  }
+
+  function renderFiles() {
+    if (!state.files.length) { listEl.innerHTML = ''; return; }
+    listEl.innerHTML = state.files.map(f => `
+      <div class="file-item" data-id="${f.id}">
+        <div class="file-info">
+          <div class="file-name">${escapeHtml(f.name)} <span style="font-weight:400;color:#94a3b8;font-size:0.75rem">${bytes(f.file.size)}</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${f.progress}%"></div></div>
+          <div class="stage-hint" data-stage="${f.id}">${escapeHtml(f.message || statusText(f.status))}</div>
+        </div>
+        <div class="file-actions">
+          <select class="lang-select" data-id="${f.id}">
+            ${[['zh-CN', '中文'], ['en', 'English'], ['ja', '日本語'], ['ko', '한국어'], ['fr', 'Français'], ['de', 'Deutsch']]
+        .map(([v, t]) => `<option value="${v}" ${f.targetLang === v ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+          <select class="engine-select" data-id="${f.id}">
+            <option value="tencent" ${f.engine === 'tencent' ? 'selected' : ''}>普通翻译</option>
+            <option value="deepseek" ${f.engine === 'deepseek' ? 'selected' : ''}>AI 智能翻译</option>
+          </select>
+          <select class="fmt-select" data-id="${f.id}">
+            ${Object.keys(OUT_FMT).map(k => `<option value="${k}" ${f.outFmt === k ? 'selected' : ''}>输出：${OUT_FMT[k]}</option>`).join('')}
+          </select>
+          <button class="btn btn-primary btn-sm process-btn" data-id="${f.id}" ${f.status === 'running' ? 'disabled' : ''}>▶ 翻译</button>
+          <button class="btn btn-danger btn-sm delete-btn" data-id="${f.id}">🗑</button>
+        </div>
+      </div>`).join('');
+  }
+
+  function statusText(s) {
+    return { pending: '等待翻译', running: '处理中…', done: '完成', error: '失败' }[s] || s;
+  }
+  function setStage(f) {
+    const el = document.querySelector(`[data-stage="${f.id}"]`);
+    if (el) el.textContent = f.message || statusText(f.status);
+    const bar = document.querySelector(`.file-item[data-id="${f.id}"] .progress-fill`);
+    if (bar) bar.style.width = f.progress + '%';
+  }
+
+  listEl.addEventListener('change', e => {
+    const id = parseInt(e.target.dataset.id, 10);
+    const f = state.files.find(x => x.id === id);
+    if (!f) return;
+    if (e.target.classList.contains('lang-select')) f.targetLang = e.target.value;
+    if (e.target.classList.contains('engine-select')) f.engine = e.target.value;
+    if (e.target.classList.contains('fmt-select')) f.outFmt = e.target.value;
+  });
+  listEl.addEventListener('click', async e => {
+    const id = parseInt(e.target.dataset.id, 10);
+    const f = state.files.find(x => x.id === id);
+    if (!f) return;
+    if (e.target.classList.contains('delete-btn')) { state.files = state.files.filter(x => x.id !== id); renderFiles(); return; }
+    if (e.target.classList.contains('process-btn')) {
+      e.target.disabled = true;
+      try { await processFile(f); } catch (err) { console.error(err); f.status = 'error'; f.message = '失败：' + err.message; setStage(f); showToast('翻译失败：' + err.message, true); }
+      e.target.disabled = false;
+    }
+  });
+
+  /* ==================== 已完成列表 ==================== */
+  function renderCompleted() {
+    if (!state.completed.length) {
+      completedEl.innerHTML = '<div style="color:#94a3b8; text-align:center; padding:2rem;">暂无完成的文档</div>';
+      return;
+    }
+    completedEl.innerHTML = state.completed.map(f => `
+      <div class="file-item">
+        <i class="fas fa-check-circle" style="color:#10b981;"></i>
+        <div class="file-info">
+          <div class="file-name">${escapeHtml(f.outName)}</div>
+          <div class="stage-hint">${escapeHtml(f.name)} · ${escapeHtml(f.summary || '')}</div>
+        </div>
+        <div class="file-actions">
+          <button class="btn btn-outline btn-sm preview-btn" data-id="${f.id}">预览</button>
+          <button class="btn btn-outline btn-sm dump-btn" data-id="${f.id}">转存 HTML</button>
+          <button class="btn btn-primary btn-sm download-btn2" data-id="${f.id}">下载</button>
+          <button class="btn btn-danger btn-sm remove-completed" data-id="${f.id}">删除</button>
+        </div>
+      </div>`).join('');
+  }
+  completedEl.addEventListener('click', e => {
+    const id = parseInt(e.target.dataset.id, 10);
+    const item = state.completed.find(x => x.id === id);
+    if (!item) return;
+    if (e.target.classList.contains('download-btn2')) download(item.blob, item.outName);
+    if (e.target.classList.contains('preview-btn')) {
+      if (item.html) openHtmlInNewTab(item.html, item.outName);
+      else if (item.blob) download(item.blob, item.outName);
+    }
+    if (e.target.classList.contains('dump-btn')) {
+      const html = item.html || '';
+      if (!html) { showToast('该输出没有 HTML 版本', true); return; }
+      download(new Blob([html], { type: 'text/html;charset=utf-8' }), baseName(item.outName) + '.html');
+    }
+    if (e.target.classList.contains('remove-completed')) {
+      state.completed = state.completed.filter(x => x.id !== id);
+      renderCompleted();
+    }
+  });
+
+  /* ==================== 解析：按格式抽取 IR ==================== */
+  async function extractIR(f, onStage) {
+    const ext = f.ext;
+    if (ext === 'docx') {
+      onStage('解析 Word 结构…');
+      if (!window.mammoth) throw new Error('mammoth 库未加载成功，请检查网络后刷新页面');
+      const buf = await f.file.arrayBuffer();
+      const ir = await dx.extractDocx(buf, { mammoth: window.mammoth, fileName: f.name });
+      ir.meta.fileName = f.name;
+      return ir;
+    }
+    if (ext === 'pdf') {
+      onStage('解析 PDF 版式（分栏/段落/表格）…');
+      if (!window.pdfjsLib) throw new Error('pdf.js 未加载成功，请检查网络后刷新页面');
+      const ir = await px.extractPDF(f.file, {
+        pdfjs: window.pdfjsLib,
+        fileName: f.name,
+        onProgress: (p, total) => onStage(`解析 PDF 第 ${p}/${total} 页…`)
+      });
+      ir.meta.fileName = f.name;
+      return ir;
+    }
+    if (ext === 'txt' || ext === 'md' || ext === 'markdown') {
+      onStage('读取文本…');
+      const text = await f.file.text();
+      const ir = core.newIR({ source: ext, fileName: f.name });
+      ir.meta.fileName = f.name;
+      // Markdown 简单结构化：# 标题 / 段落 / > 引用
+      const lines = text.replace(/\r\n?/g, '\n').split('\n');
+      let i = 0;
+      while (i < lines.length) {
+        const raw = lines[i];
+        const line = raw.trim();
+        if (!line) { i++; continue; }
+        const h = /^(#{1,6})\s+(.*)$/.exec(line);
+        if (h) {
+          ir.blocks.push({ id: core.uid('b'), type: 'heading', level: Math.min(4, h[1].length), runs: [{ t: h[2] }], align: null });
+          i++; continue;
+        }
+        if (line.startsWith('|') && line.split('|').length >= 3) {
+          const rows = [];
+          while (i < lines.length && lines[i].trim().startsWith('|')) {
+            const cells = lines[i].trim().split('|').slice(1, -1).map(c => c.trim());
+            if (!cells.every(c => /^-{2,}$/.test(c) || c === '')) rows.push(cells.map(c => ({ text: c, runs: [{ t: c }], colspan: 1, rowspan: 1 })));
+            i++;
+          }
+          ir.blocks.push({ id: core.uid('t'), type: 'table', rows: rows, headerRows: 1 });
+          continue;
+        }
+        ir.blocks.push({ id: core.uid('b'), type: 'paragraph', runs: [{ t: line }], align: null, indent: null });
+        i++;
+      }
+      ir.bodySize = 10.5;
+      core.applyHeadingLevels(ir, {});
+      return ir;
+    }
+    if (['png', 'jpg', 'jpeg'].includes(ext)) {
+      onStage('OCR 识别图片文字…');
+      if (!window.Tesseract) throw new Error('OCR 组件未加载成功，请检查网络后刷新页面');
+      const worker = await window.Tesseract.createWorker('chi_sim+eng', 1);
+      const { data: { text } } = await worker.recognize(f.file);
+      await worker.terminate();
+      const ir = core.newIR({ source: 'image', fileName: f.name });
+      ir.meta.fileName = f.name;
+      text.split(/\n{1,}/).map(s => s.trim()).filter(Boolean).forEach(line => {
+        ir.blocks.push({ id: core.uid('b'), type: 'paragraph', runs: [{ t: line }], align: line.length < 20 ? 'center' : null, indent: null });
+      });
+      ir.bodySize = 11;
+      return ir;
+    }
+    throw new Error('不支持的格式: ' + ext);
+  }
+
+  /* ==================== 术语库 / 翻译记忆 / 选项 ==================== */
+
+  /** 读取选项（符号保护、翻译记忆） */
+  function loadOptions() {
+    let o = { protectSymbols: true, useTM: true, academicTerms: false };
+    try {
+      const raw = localStorage.getItem(LS_OPTS);
+      if (raw) o = Object.assign(o, JSON.parse(raw));
+    } catch (e) { }
+    return o;
+  }
+  function saveOptions(o) {
+    try { localStorage.setItem(LS_OPTS, JSON.stringify(o)); } catch (e) { }
+  }
+
+  /** 术语表持久化 */
+  function loadTermsText() {
+    try { return localStorage.getItem(LS_TERMS) || ''; } catch (e) { return ''; }
+  }
+  function saveTermsText(t) {
+    try { localStorage.setItem(LS_TERMS, t); } catch (e) { }
+    updateToolsSummary();
+  }
+
+  function updateToolsSummary() {
+    const n = gloss.parseTerms($('termsText').value).length;
+    const s = tmMod.TM.stats();
+    $('toolsSummary').textContent = `术语 ${n} 条 · 记忆 ${s.entries} 段（复用 ${s.hits} 次）`;
+  }
+  function refreshTMStats() {
+    const s = tmMod.TM.stats();
+    $('tmStats').textContent = `${s.entries} 段（命中复用 ${s.hits} 次，其中重复条目 ${s.repeated} 条，上限 ${s.max}）`;
+    updateToolsSummary();
+  }
+
+  /** 初始化设置面板 */
+  function initTools() {
+    const o = loadOptions();
+    $('optProtectSymbols').checked = !!o.protectSymbols;
+    $('optUseTM').checked = !!o.useTM;
+    $('termsText').value = loadTermsText();
+    $('appVersion').textContent = VERSION;
+    refreshTMStats();
+
+    /* ---- 翻译服务地址 ---- */
+    const apiInput = $('apiUrlInput');
+    apiInput.value = getApiUrl();
+    const showApiStatus = (text, ok) => {
+      $('apiStatus').textContent = text;
+      $('apiStatus').style.color = ok === true ? '#10b981' : (ok === false ? '#dc2626' : '#94a3b8');
+    };
+    if (apiInput.value) showApiStatus('已配置：' + apiInput.value, null);
+
+    $('saveApiBtn').addEventListener('click', () => {
+      const v = apiInput.value.trim();
+      setApiUrl(v);
+      showApiStatus(v ? '已保存：' + v : '已清空，翻译前请先填写服务地址', v ? true : null);
+      showToast(v ? '服务地址已保存' : '服务地址已清空');
+    });
+    $('testApiBtn').addEventListener('click', async () => {
+      const v = apiUrlOrInput();
+      if (!v) { showApiStatus('请先填写服务地址', false); return; }
+      showApiStatus('正在测试…', null);
+      try {
+        const res = await fetch(v, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: '你好', target: 'en', engine: 'tencent' })
+        });
+        const data = await res.json();
+        if (data && data.code === 0) {
+          showApiStatus('连接正常，返回示例：' + String(data.result).slice(0, 40), true);
+        } else {
+          showApiStatus('服务返回异常：' + ((data && data.result) || '未知错误'), false);
+        }
+      } catch (e) {
+        showApiStatus('无法连接：' + e.message + '（检查地址是否正确、是否允许跨域）', false);
+      }
+    });
+    function apiUrlOrInput() { return ($('apiUrlInput').value || '').trim() || getApiUrl(); }
+
+    $('toggleToolsBtn').addEventListener('click', () => {
+      const p = $('toolsPanel');
+      p.style.display = p.style.display === 'none' ? 'block' : 'none';
+      refreshTMStats();
+    });
+    $('optProtectSymbols').addEventListener('change', e => {
+      const cur = loadOptions(); cur.protectSymbols = e.target.checked; saveOptions(cur);
+    });
+    $('optUseTM').addEventListener('change', e => {
+      const cur = loadOptions(); cur.useTM = e.target.checked; saveOptions(cur);
+    });
+    $('termsText').addEventListener('input', () => saveTermsText($('termsText').value));
+
+    $('loadAcademicTerms').addEventListener('click', async () => {
+      // 优先用内嵌术语库（离线/单文件部署也能用）；取不到再尝试同目录文件
+      let txt = gloss.ACADEMIC_TERMS_TEXT || '';
+      if (!txt) {
+        for (const p of ['./src/glossary-academic.txt', './glossary-academic.txt']) {
+          try {
+            const res = await fetch(p);
+            if (res.ok) { txt = await res.text(); break; }
+          } catch (e) { /* 继续尝试下一个路径 */ }
+        }
+      }
+      if (!txt) { showToast('未能载入内置术语库，请手动粘贴术语', true); return; }
+      const cur = $('termsText').value.trim();
+      $('termsText').value = cur ? (cur + '\n\n' + txt) : txt;
+      saveTermsText($('termsText').value);
+      const n = gloss.parseTerms($('termsText').value).length;
+      showToast(`已载入学术常用术语，当前共 ${n} 条（可自行增删）`);
+    });
+    $('importTermsFile').addEventListener('click', () => $('termsFileInput').click());
+    $('termsFileInput').addEventListener('change', async e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const txt = await f.text();
+      $('termsText').value = txt;
+      saveTermsText(txt);
+      showToast(`已导入术语表：${gloss.parseTerms(txt).length} 条`);
+      e.target.value = '';
+    });
+    $('exportTermsFile').addEventListener('click', () => {
+      const items = gloss.parseTerms($('termsText').value);
+      if (!items.length) { showToast('术语表为空', true); return; }
+      const txt = gloss.serializeTerms(items);
+      download(new Blob(['\uFEFF' + txt], { type: 'text/plain;charset=utf-8' }), '灵译-术语表.txt');
+    });
+
+    $('tmExport').addEventListener('click', () => {
+      const n = tmMod.TM.stats().entries;
+      if (!n) { showToast('翻译记忆还是空的', true); return; }
+      download(new Blob([tmMod.TM.exportJSON()], { type: 'application/json;charset=utf-8' }), '灵译-翻译记忆.json');
+    });
+    $('tmImport').addEventListener('click', () => $('tmFileInput').click());
+    $('tmFileInput').addEventListener('change', async e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = tmMod.TM.importJSON(await f.text(), true);
+      if (r.error) showToast(r.error, true);
+      else showToast(`已导入记忆 ${r.added} 条（跳过 ${r.skipped} 条）`);
+      refreshTMStats();
+      e.target.value = '';
+    });
+    $('tmClear').addEventListener('click', () => {
+      tmMod.TM.clear();
+      refreshTMStats();
+      showToast('翻译记忆已清空');
+    });
+  }
+
+  /* ==================== 主流程 ==================== */
+  async function processFile(f) {
+    f.status = 'running'; f.progress = 5; f.message = '准备中…'; setStage(f);
+
+    const ir = await extractIR(f, (msg) => { f.message = msg; setStage(f); });
+    const blockCount = (function count(bs) {
+      let n = 0;
+      for (const b of bs) {
+        if (b.type === 'container') n += count(b.columns.reduce((a, g) => a.concat(g.blocks || []), []));
+        else n++;
+      }
+      return n;
+    })(ir.blocks);
+    if (!blockCount) throw new Error('没有解析到任何内容（可能是扫描件，请改用图片模式）');
+    const settings = loadOptions();
+    const apiUrl = getApiUrl();
+    if (!apiUrl) {
+      $('toolsPanel').style.display = 'block';
+      $('apiUrlInput').focus();
+      throw new Error('还没有配置翻译服务地址：请在「翻译服务设置」里填入你的云函数 URL（见 README 第四节）');
+    }
+    f.progress = 30;
+    f.message = `解析完成：${blockCount} 个内容块` +
+      (settings.protectSymbols ? '，已启用符号保护' : '') +
+      (settings.useTM ? '，已启用翻译记忆' : '') + '，开始翻译…';
+    setStage(f);
+
+    const terms = gloss.parseTerms($('termsText').value);
+    const result = await tr.translateIR(ir, {
+      apiUrl: apiUrl,
+      target: f.targetLang,
+      engine: f.engine,
+      mode: f.engine === 'deepseek' ? 'polish' : 'normal',
+      terms: terms,
+      useTM: settings.useTM,
+      protectSymbols: settings.protectSymbols,
+      onProgress: (done, total, msg) => {
+        f.progress = 30 + Math.round(done / Math.max(1, total) * 55);
+        f.message = msg;
+        setStage(f);
+      }
+    });
+    refreshTMStats();
+    f.progress = 90;
+    f.message = `翻译完成（成功 ${result.translated} 段 · 记忆复用 ${result.fromCache} 段 · 保留原文 ${result.fallback} 段` +
+      ` · 保护 ${result.symbols} 个符号 / 套用 ${result.termsApplied} 处术语），正在生成文件…`;
+    setStage(f);
+    if (result.missingSymbols && result.missingSymbols.length) {
+      showToast(`提示：有 ${result.missingSymbols.length} 个符号占位符被翻译引擎改动，已尽量还原`, true);
+    }
+
+    const outBase = baseName(f.name) + '-灵译-' + (f.targetLang === 'zh-CN' ? '中文' : f.targetLang.toUpperCase());
+    const opts = { title: outBase, bodySize: ir.bodySize, fileName: outBase };
+    let blob, outName, html = null;
+
+    if (f.outFmt === 'docx') {
+      if (!window.docx) throw new Error('docx 库未加载成功，请检查网络后刷新页面');
+      const r = await rd.renderDocx(ir, Object.assign({ docx: window.docx, fileName: outBase }, opts));
+      blob = r.blob; outName = r.filename;
+      html = rh.renderDocument(ir, opts);
+    } else if (f.outFmt === 'pdf') {
+      html = rh.renderDocument(ir, opts);
+      blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      outName = outBase + '.html';
+      openHtmlInNewTab(html, outName);
+      showToast('已在新窗口打开：请在打印对话框中选择「另存为 PDF」', false);
+    } else if (f.outFmt === 'bilingual') {
+      html = rh.renderBilingualDocument(ir, opts);
+      blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      outName = outBase + '-对照.html';
+      openHtmlInNewTab(html, outName);
+    } else if (f.outFmt === 'html') {
+      html = rh.renderDocument(ir, opts);
+      blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      outName = outBase + '.html';
+      openHtmlInNewTab(html, outName);
+    } else {
+      const text = rh.renderText(ir, opts);
+      blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
+      outName = outBase + '.txt';
+    }
+
+    f.status = 'done'; f.progress = 100; f.message = '完成';
+    state.files = state.files.filter(x => x.id !== f.id);
+    state.completed.push({
+      id: f.id, name: f.name, outName: outName, blob: blob, html: html,
+      summary: `成功 ${result.translated} 段 / 保留 ${result.fallback} 段`
+    });
+    addRecord(f, outName);
+    renderFiles(); renderCompleted();
+    showToast('翻译完成：' + outName);
+    if (f.outFmt === 'docx' || f.outFmt === 'txt') download(blob, outName);
+  }
+
+  /* ==================== 用户与记录 ==================== */
+  function loadUsers() { try { return JSON.parse(localStorage.getItem('lingyi_users') || '{}'); } catch (e) { return {}; } }
+  function saveUsers(u) { localStorage.setItem('lingyi_users', JSON.stringify(u)); }
+  function loadRecords() { try { return JSON.parse(localStorage.getItem('lingyi_records') || '[]'); } catch (e) { return []; } }
+  function saveRecords(r) { localStorage.setItem('lingyi_records', JSON.stringify(r)); }
+  function cleanRecords(r) { const d = 30 * 24 * 3600 * 1000; return r.filter(x => Date.now() - x.timestamp < d); }
+  function addRecord(f, outName) {
+    if (!state.currentUser) return;
+    const rs = loadRecords();
+    rs.push({ username: state.currentUser.username, filename: f.name, output: outName, target: f.targetLang, engine: f.engine, timestamp: Date.now() });
+    saveRecords(cleanRecords(rs));
+  }
+  function updateLoginUI() {
+    const u = state.currentUser;
+    $('loginStatus').textContent = u ? (u.isAdmin ? '👑 管理员' : '👤 ' + u.username) : '';
+    $('loginBtn').style.display = u ? 'none' : 'inline-flex';
+    $('historyBtn').style.display = u ? 'inline-flex' : 'none';
+    $('logoutBtn').style.display = u ? 'inline-flex' : 'none';
+  }
+  function login(username, password) {
+    if (username === '' && password === 'A123666') {
+      state.currentUser = { username: 'admin', isAdmin: true };
+      updateLoginUI(); showToast('管理员登录成功'); return true;
+    }
+    if (!username.trim()) { showToast('账号不能为空', true); return false; }
+    const users = loadUsers();
+    if (users[username]) {
+      if (users[username].password !== password) { showToast('密码错误', true); return false; }
+    } else {
+      users[username] = { password };
+      saveUsers(users);
+    }
+    state.currentUser = { username, isAdmin: false };
+    updateLoginUI();
+    showToast('欢迎，' + username);
+    return true;
+  }
+  $('loginBtn').addEventListener('click', () => $('loginModal').classList.add('active'));
+  $('closeLoginModal').addEventListener('click', () => $('loginModal').classList.remove('active'));
+  $('doLoginBtn').addEventListener('click', () => {
+    if (login($('loginUsername').value.trim(), $('loginPassword').value.trim())) {
+      $('loginModal').classList.remove('active');
+      $('loginUsername').value = ''; $('loginPassword').value = '';
+    }
+  });
+  $('logoutBtn').addEventListener('click', () => {
+    state.currentUser = null; state.completed = [];
+    updateLoginUI(); renderCompleted(); showToast('已退出登录');
+  });
+  $('historyBtn').addEventListener('click', () => {
+    const rs = cleanRecords(loadRecords()).filter(r => !state.currentUser || r.username === state.currentUser.username).reverse();
+    $('historyList').innerHTML = rs.length ? rs.map(r => `
+      <div style="padding:0.5rem 0; border-bottom:1px dashed #e2e8f0; font-size:0.85rem;">
+        <div style="font-weight:600;">${escapeHtml(r.filename)}</div>
+        <div style="color:#64748b; font-size:0.75rem;">${new Date(r.timestamp).toLocaleString()} · ${escapeHtml(r.output || '')}</div>
+      </div>`).join('') : '<div style="color:#94a3b8;">暂无记录</div>';
+    $('historyModal').classList.add('active');
+  });
+  $('closeHistoryModal').addEventListener('click', () => $('historyModal').classList.remove('active'));
+
+  /* ==================== 二维码 ==================== */
+  try {
+    if (window.QRCode) {
+      new QRCode($('qrContainer'), { text: location.href, width: 36, height: 36, colorDark: '#1e293b', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
+      $('qrSection').addEventListener('click', () => {
+        $('qrLargeContainer').innerHTML = '';
+        new QRCode($('qrLargeContainer'), { text: location.href, width: 200, height: 200, colorDark: '#1e293b', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+        $('qrZoomModal').classList.add('active');
+      });
+      $('closeQrZoom').addEventListener('click', () => $('qrZoomModal').classList.remove('active'));
+      $('qrZoomModal').addEventListener('click', e => { if (e.target === $('qrZoomModal')) $('qrZoomModal').classList.remove('active'); });
+    }
+  } catch (e) { console.warn('二维码生成失败', e); }
+
+  /* ==================== 微信环境提示 ==================== */
+  if (/MicroMessenger/i.test(navigator.userAgent)) {
+    document.querySelectorAll('.mobile-warning').forEach(el => el.style.display = 'block');
+  }
+
+  updateLoginUI();
+  initTools();
+  renderFiles();
+  renderCompleted();
+})();
+</script>
+</body>
+</html>

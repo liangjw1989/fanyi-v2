@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>灵译 · 文档翻译（保留原排版）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+  <!-- 第三方库（需联网加载；本地 vendor/ 目录存在时优先用本地） -->
+  <script src="./vendor/qrcode.min.js" onerror="this.remove()"></script>
+  <script>window.QRCode || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>');</script>
+
+  <script src="./vendor/pdf.min.js" onerror="this.remove()"></script>
+  <script>window.pdfjsLib || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');</script>
+
+  <script src="./vendor/mammoth.browser.min.js" onerror="this.remove()"></script>
+  <script>window.mammoth || document.write('<script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"><\/script>');</script>
+
+  <script src="./vendor/docx.umd.js" onerror="this.remove()"></script>
+  <script>window.docx || document.write('<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"><\/script>');</script>
+
+  <script src="./vendor/marked.min.js" onerror="this.remove()"></script>
+  <script>window.marked || document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');</script>
+
+  <script src="./vendor/tesseract.min.js" onerror="this.remove()"></script>
+  <script>window.Tesseract || document.write('<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"><\/script>');</script>
+
+  <style>
+    /* ==================== CSS 变量定义 ==================== */
+    :root {
+      --primary: #4f6ef7;
+      --primary-dark: #3b54d4;
+      --primary-light: #eef2ff;
+      --gradient-1: linear-gradient(135deg, #4f6ef7, #7b5cff);
+      --gradient-2: linear-gradient(135deg, #4f6ef7, #a855f7, #ec4899);
+      --bg: #f0f4fd;
+      --bg-card: rgba(255,255,255,0.75);
+      --text: #1e293b;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 20px 40px -12px rgba(0,0,0,0.12);
+      --radius: 2rem;
+      --radius-sm: 1rem;
+      --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(145deg, #f0f4fd 0%, #e6ebf7 50%, #f8fafc 100%);
+      min-height: 100vh; display: flex; justify-content: center;
+      color: var(--text); padding: 1rem; -webkit-font-smoothing: antialiased;
+    }
+    body::before {
+      content: ''; position: fixed; top: -50%; right: -30%; width: 80vw; height: 80vw;
+      background: radial-gradient(circle, rgba(79,110,247,0.06) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .app-wrapper { width: 100%; max-width: 1200px; display: flex; flex-direction: column; gap: 1.5rem; position: relative; z-index: 1; }
+    .card {
+      background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,0.8); transition: var(--transition);
+    }
+    .card:hover { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); }
+    .top-bar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; }
+    .brand { display:flex; align-items:center; gap:0.75rem; }
+    .brand-icon {
+      background: var(--gradient-1); width:48px; height:48px; border-radius:18px;
+      display:flex; align-items:center; justify-content:center; color:white; font-size:24px;
+      box-shadow: 0 10px 20px -5px rgba(79,110,247,0.4); animation: pulse 3s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 10px 20px -5px rgba(79,110,247,0.4); }
+      50% { box-shadow: 0 15px 30px -5px rgba(79,110,247,0.6); }
+    }
+    .brand-text h1 { font-weight:700; font-size:1.8rem; background:linear-gradient(to right,#1e293b,#334155); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .brand-text span { font-size:0.8rem; color:var(--text-secondary); font-weight:500; }
+    .qr-section { display:flex; align-items:center; gap:0.8rem; cursor:pointer; transition:var(--transition); padding:0.4rem 0.8rem; border-radius:2rem; background:rgba(255,255,255,0.5); }
+    .qr-section:hover { transform:scale(1.05); background:rgba(255,255,255,0.8); }
+    .qr-code-wrapper { width:40px; height:40px; border-radius:12px; padding:2px; background:var(--gradient-2); box-shadow:0 4px 12px rgba(79,110,247,0.3); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .qr-code-inner { width:36px; height:36px; border-radius:10px; background:white; overflow:hidden; }
+    .qr-text { font-size:0.8rem; color:var(--text-secondary); font-weight:500; white-space:nowrap; }
+    .btn { padding:0.5rem 1.2rem; border-radius:2rem; font-weight:600; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:0.5rem; transition:0.2s; font-size:0.85rem; font-family:inherit; white-space:nowrap; }
+    .btn:active { transform:scale(0.96); }
+    .btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .btn-primary { background:var(--gradient-1); color:white; box-shadow:0 4px 15px rgba(79,110,247,0.3); }
+    .btn-primary:hover:not(:disabled) { background:linear-gradient(135deg,#3b54d4,#6a4be0); }
+    .btn-outline { background:white; border:1.5px solid var(--border); color:#334155; }
+    .btn-outline:hover { background:#f8fafc; border-color:var(--primary); }
+    .btn-danger { background:#ef4444; color:white; }
+    .btn-sm { padding:0.3rem 0.8rem; font-size:0.75rem; }
+    .tabs { display:flex; gap:0.3rem; margin-bottom:1.5rem; background:#e2e8f0; padding:0.3rem; border-radius:2rem; width:fit-content; }
+    .tab-btn { border:none; background:transparent; color:#64748b; padding:0.6rem 1.8rem; border-radius:1.8rem; font-weight:600; cursor:pointer; transition:all 0.3s ease; font-size:0.9rem; }
+    .tab-btn.active { background:white; color:var(--primary); box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    .upload-area { border:2px dashed #cbd5e1; border-radius:1rem; padding:1.2rem 1rem; text-align:center; cursor:pointer; background:rgba(248,250,252,0.7); margin:0.8rem 0; transition:0.2s; position:relative; }
+    .upload-area:hover { border-color:var(--primary); background:var(--primary-light); }
+    .upload-area.drag-over { border-color:var(--primary); background:#eef2ff; transform:scale(1.01); }
+    .upload-title { font-weight:600; font-size:0.95rem; margin-bottom:0.2rem; }
+    .upload-hint { font-size:0.75rem; color:var(--text-secondary); }
+    .file-item { background:white; border-radius:1rem; padding:0.9rem; margin-bottom:0.6rem; display:flex; align-items:center; gap:0.8rem; border:1px solid var(--border); flex-wrap:wrap; transition:0.2s; animation:slideIn 0.3s ease-out; }
+    @keyframes slideIn { from { opacity:0; transform:translateY(-10px);} to { opacity:1; transform:translateY(0);} }
+    .file-item:hover { border-color:var(--primary); box-shadow:0 2px 10px rgba(0,0,0,0.05); }
+    .file-info { flex:1; min-width:140px; }
+    .file-name { font-weight:600; font-size:0.9rem; word-break:break-all; }
+    .progress-bar { width:80px; height:5px; background:#e2e8f0; border-radius:10px; overflow:hidden; margin-top:0.3rem; }
+    .progress-fill { height:100%; background:var(--gradient-1); width:0%; transition:0.3s; }
+    .file-actions { display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap; }
+    select { padding:0.35rem 0.6rem; border-radius:0.6rem; border:1px solid var(--border); font-size:0.75rem; background:white; }
+    .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter:blur(4px); align-items:center; justify-content:center; z-index:1000; }
+    .modal.active { display:flex; }
+    .modal-content { background:white; border-radius:1.5rem; padding:1.5rem; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; }
+    .close-modal { float:right; cursor:pointer; font-size:1.4rem; color:#94a3b8; }
+    .toast-notification { position:fixed; bottom:2rem; right:2rem; background:#1e293b; color:white; padding:0.8rem 1.5rem; border-radius:2rem; transform:translateY(100px); opacity:0; transition:0.3s; z-index:999; max-width:70vw; }
+    .toast-notification.show { transform:translateY(0); opacity:1; }
+    .footer-hint { text-align:center; font-size:0.75rem; color:#64748b; background:rgba(255,255,255,0.6); padding:0.6rem; border-radius:1.5rem; backdrop-filter:blur(10px); margin-top:0.5rem; }
+    .form-group { margin-bottom:0.8rem; }
+    .form-group label { display:block; font-size:0.8rem; color:#475569; margin-bottom:0.3rem; font-weight:600; }
+    .form-group input { width:100%; padding:0.6rem 0.8rem; border-radius:0.7rem; border:1px solid var(--border); font-size:0.9rem; }
+    .stage-hint { font-size:0.75rem; color:var(--text-secondary); margin-top:0.35rem; }
+    .fmt-note { background:#f8fafc; border:1px dashed #cbd5e1; border-radius:0.8rem; padding:0.7rem 0.9rem; font-size:0.78rem; color:#475569; line-height:1.6; margin-top:0.8rem; }
+    .fmt-note b { color:var(--primary); }
+    #translateFileList { counter-reset: translateCounter; }
+    #translateFileList .file-item { counter-increment: translateCounter; }
+    #translateFileList .file-item::before { content: counter(translateCounter); background:var(--gradient-1); color:white; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; flex-shrink:0; }
+    #completedList { counter-reset: completedCounter; }
+    #completedList .file-item { counter-increment: completedCounter; }
+    #completedList .file-item::before { content: counter(completedCounter); background:var(--gradient-1); color:white; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; flex-shrink:0; }
+    @media (max-width: 768px) {
+      body { padding:0.5rem; }
+      .card { padding:1rem; border-radius:1.5rem; }
+      .brand-text h1 { font-size:1.4rem; }
+      .btn { padding:0.4rem 1rem; font-size:0.8rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <div class="card top-bar">
+    <div class="brand">
+      <div class="brand-icon">🌐</div>
+      <div class="brand-text">
+        <h1>灵译</h1>
+        <span>文档翻译 · 保留原排版</span>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+      <span id="loginStatus" style="font-size:0.85rem; color:#475569; font-weight:500;"></span>
+      <button class="btn btn-outline btn-sm" id="loginBtn">👤 登录</button>
+      <button class="btn btn-outline btn-sm" id="historyBtn" style="display:none;">🕐 记录</button>
+      <button class="btn btn-outline btn-sm" id="logoutBtn" style="display:none;">🚪 退出</button>
+      <div class="qr-section" id="qrSection">
+        <div class="qr-code-wrapper"><div class="qr-code-inner" id="qrContainer"></div></div>
+        <span class="qr-text">扫码打开</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label for="translateFileInput" class="upload-area" id="translateUpload" style="cursor:pointer; display:block;">
+      <div style="font-size:2.5rem; color:var(--primary); margin-bottom:0.5rem;">📄</div>
+      <div class="upload-title">点击上传需翻译的文件</div>
+      <div class="upload-hint">PDF · Word(.docx) · TXT · Markdown · 图片（保留字号、对齐、缩进、表格、分栏）</div>
+      <div class="upload-hint mobile-warning" style="display:none; color:#e67e22; margin-top:0.5rem;">
+        ⚠️ 如无法选择文档，请点击右上角「…」→「在浏览器中打开」
+      </div>
+    </label>
+    <input type="file" id="translateFileInput" multiple accept=".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg" style="display:none;">
+    <div class="fmt-note">
+      <b>保版式翻译流程：</b>解析原文件结构（段落 / 字号 / 对齐 / 缩进 / 表格 / 分栏）→ 只翻译文字、不重排结构 → 按原骨架重新生成文件。
+      输出 <b>Word</b> 可 1:1 保留版式；输出 <b>PDF</b> 由浏览器打印生成，版式同样保留。
+    </div>
+
+    <!-- ==================== 术语库 / 翻译记忆 / 符号保护 ==================== -->
+    <div style="margin-top:0.9rem;">
+      <button class="btn btn-outline btn-sm" id="toggleToolsBtn">⚙️ 术语库 · 翻译记忆 · 符号保护</button>
+      <span id="toolsSummary" style="font-size:0.78rem; color:#64748b; margin-left:0.6rem;"></span>
+    </div>
+
+    <div id="toolsPanel" style="display:none; margin-top:0.8rem; border:1px solid var(--border); border-radius:1rem; padding:1rem; background:#fff;">
+      <div style="font-weight:600; margin-bottom:0.6rem;">🔌 翻译服务设置</div>
+      <div style="font-size:0.78rem; color:#64748b; margin-bottom:0.3rem;">
+        填入你自己的翻译服务（云函数）地址。程序里<b>不保存任何密钥</b>：
+        腾讯云 SecretId/Key、DeepSeek API Key 都放在云函数的环境变量里。
+        留空则无法翻译。
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap;">
+        <input type="text" id="apiUrlInput" spellcheck="false" placeholder="https://你的云函数地址"
+          style="flex:1; min-width:240px; padding:0.5rem 0.7rem; border:1px solid var(--border); border-radius:0.6rem; font-size:0.8rem; font-family:Consolas,monospace;">
+        <button class="btn btn-primary btn-sm" id="saveApiBtn">保存</button>
+        <button class="btn btn-outline btn-sm" id="testApiBtn">测试连接</button>
+      </div>
+      <div id="apiStatus" style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.6rem;">
+        未配置。参考 README「后端接口约定」自行部署云函数，或向服务提供者索取地址。
+      </div>
+
+      <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
+
+      <div style="font-weight:600; margin-bottom:0.6rem;">🛡️ 翻译质量控制</div>
+
+      <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin-bottom:0.4rem;">
+        <input type="checkbox" id="optProtectSymbols" checked>
+        保护数字 / 单位 / 上下标 / 希腊字母 / 参考文献编号（<b>强烈建议开启</b>）
+      </label>
+      <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin-bottom:0.6rem;">
+        <input type="checkbox" id="optUseTM" checked>
+        启用翻译记忆（同一内容只翻一次，改稿重译只翻改动段落）
+      </label>
+
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+        <button class="btn btn-outline btn-sm" id="loadAcademicTerms">📚 载入学术常用术语（推荐）</button>
+        <button class="btn btn-outline btn-sm" id="importTermsFile">📥 导入术语表文件</button>
+        <button class="btn btn-outline btn-sm" id="exportTermsFile">📤 导出术语表</button>
+        <input type="file" id="termsFileInput" accept=".txt,.csv,.tsv,.md" style="display:none;">
+      </div>
+
+      <div style="font-size:0.78rem; color:#64748b; margin-bottom:0.3rem;">
+        术语表（每行一条，格式 <code>源词 = 目标译法</code>；<code>#</code> 开头为注释）
+      </div>
+      <textarea id="termsText" spellcheck="false"
+        style="width:100%; height:150px; font-family:Consolas,monospace; font-size:12px; line-height:1.5; border:1px solid var(--border); border-radius:0.6rem; padding:0.6rem;"
+        placeholder="精子DNA碎片化指数 = sperm DNA fragmentation index&#10;不育男性 = infertile men&#10;参考文献 = References"></textarea>
+
+      <div style="margin-top:0.7rem; font-size:0.8rem; color:#475569;">
+        <b>翻译记忆：</b><span id="tmStats">—</span>
+        <button class="btn btn-outline btn-sm" id="tmExport" style="margin-left:0.5rem;">导出</button>
+        <button class="btn btn-outline btn-sm" id="tmImport">导入</button>
+        <button class="btn btn-danger btn-sm" id="tmClear">清空</button>
+        <input type="file" id="tmFileInput" accept=".json" style="display:none;">
+      </div>
+
+      <div style="margin-top:0.7rem; font-size:0.75rem; color:#94a3b8; line-height:1.7;">
+        版本 <span id="appVersion">—</span> · © 2026 灵译 LingYi · 个人使用免费，商业使用需获得授权。
+      </div>
+    </div>
+
+    <div id="translateFileList"></div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+      <i class="fas fa-check-circle" style="color:#10b981;"></i> 已完成的文档
+    </div>
+    <div id="completedList"><div style="color:#94a3b8; text-align:center; padding:2rem;">暂无完成的文档</div></div>
+  </div>
+
+  <div class="footer-hint">🔐 登录后使用完整功能 · 扫码可在手机打开</div>
+</div>
+
+<!-- 二维码放大 -->
+<div class="modal" id="qrZoomModal">
+  <div class="modal-content" style="max-width:350px;">
+    <span class="close-modal" id="closeQrZoom">&times;</span>
+    <div style="text-align:center;">
+      <div id="qrLargeContainer" style="display:inline-block;"></div>
+      <h3>灵译</h3><p>扫描二维码打开应用</p>
+    </div>
+  </div>
+</div>
+
+<!-- 登录 -->
+<div class="modal" id="loginModal">
+  <div class="modal-content">
+    <span class="close-modal" id="closeLoginModal">&times;</span>
+    <h3 style="margin-bottom:1rem; text-align:center;">账号登录</h3>
+    <div class="form-group"><label>账号</label><input type="text" id="loginUsername" placeholder="输入账号"></div>
+    <div class="form-group"><label>密码</label><input type="password" id="loginPassword" placeholder="输入密码"></div>
+    <button class="btn btn-primary" id="doLoginBtn" style="width:100%;">登录</button>
+    <p style="margin-top:0.8rem; font-size:0.75rem; color:#64748b; text-align:center;">没有账号？输入账号密码后将自动注册并登录。</p>
+  </div>
+</div>
+
+<!-- 历史记录 -->
+<div class="modal" id="historyModal">
+  <div class="modal-content">
+    <span class="close-modal" id="closeHistoryModal">&times;</span>
+    <h3 style="margin-bottom:1rem;">翻译记录（近 30 天）</h3>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<div class="toast-notification" id="toast"></div>
+
+<!-- 部署配置（可选：接口地址；不含任何密钥。缺失不影响使用，界面里填即可） -->
+<script src="./config.js" onerror="this.remove()"></script>
+
+<!-- ==================== 核心模块 ==================== -->
+<script src="./src/core.js"></script>
+<script src="./src/layout.js"></script>
+<script src="./src/docx-extract.js"></script>
+<script src="./src/pdf-extract.js"></script>
+<script src="./src/render-html.js"></script>
+<script src="./src/render-docx.js"></script>
+<script src="./src/glossary.js"></script>
+<script src="./src/tm.js"></script>
+<script src="./src/translate.js"></script>
+
+<script>
+(function () {
+  'use strict';
+  const core = window.LingyiCore;
+  const dx = window.LingyiDocx;
+  const px = window.LingyiPdfExtract;
+  const rh = window.LingyiRenderHtml;
+  const rd = window.LingyiRenderDocx;
+  const tr = window.LingyiTranslate;
+  const gloss = window.LingyiGlossary;
+  const tmMod = window.LingyiTM;
+
+  /* ==================== 配置 ====================
+   * 安全要点：这里只保存"云函数地址"，绝不保存任何密钥。
+   * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
+   * 地址来源优先级：界面里填写（localStorage） > config.js > 空
+   */
+  const VERSION = '2.2.0';
+  const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
+  const OUT_FMT = { docx: 'Word（版式最完整）', pdf: 'PDF（浏览器打印导出）', html: 'HTML 网页', bilingual: '中英对照网页', txt: '纯文本' };
+  const LS_TERMS = 'lingyi_terms_v1';
+  const LS_OPTS = 'lingyi_options_v1';
+  const LS_API = 'lingyi_api_url_v1';
+
+  /** 取当前生效的后端地址 */
+  function getApiUrl() {
+    try {
+      const saved = (localStorage.getItem(LS_API) || '').trim();
+      if (saved) return saved;
+    } catch (e) { /* 隐私模式等，忽略 */ }
+    return (DEPLOY_CONFIG.API_URL || '').trim();
+  }
+  function setApiUrl(v) {
+    try { localStorage.setItem(LS_API, String(v || '').trim()); } catch (e) { }
+  }
+
+  const state = { files: [], completed: [], currentUser: null, nextId: 1 };
+
+  /* ==================== 工具 ==================== */
+  const $ = id => document.getElementById(id);
+  function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str == null ? '' : str; return d.innerHTML; }
+  function showToast(msg, err) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.style.background = err ? '#dc2626' : '#1e293b';
+    t.classList.add('show');
+    clearTimeout(t._t);
+    t._t = setTimeout(() => t.classList.remove('show'), 3200);
+  }
+  function bytes(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : (n / 1024).toFixed(0) + ' KB'; }
+  function baseName(name) { return String(name).replace(/\.[^.]+$/, ''); }
+  function download(blobOrUrl, filename) {
+    const a = document.createElement('a');
+    a.href = typeof blobOrUrl === 'string' ? blobOrUrl : URL.createObjectURL(blobOrUrl);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    if (typeof blobOrUrl !== 'string') setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  }
+  function openHtmlInNewTab(html, title) {
+    const w = window.open('', '_blank');
+    if (!w) { showToast('浏览器阻止了新窗口，请允许弹窗', true); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+    w.document.title = title || '灵译输出';
+  }
+
+  /* ==================== 上传与列表 ==================== */
+  const input = $('translateFileInput');
+  const uploadArea = $('translateUpload');
+  const listEl = $('translateFileList');
+  const completedEl = $('completedList');
+
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault(); uploadArea.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  });
+  input.addEventListener('change', e => { if (e.target.files.length) addFiles(e.target.files); input.value = ''; });
+
+  const ALLOWED = ['pdf', 'docx', 'txt', 'md', 'markdown', 'png', 'jpg', 'jpeg'];
+  function addFiles(files) {
+    for (const f of files) {
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      if (!ALLOWED.includes(ext)) { showToast('暂不支持该格式: ' + f.name, true); continue; }
+      state.files.push({
+        id: state.nextId++, file: f, name: f.name, ext: ext,
+        status: 'pending', progress: 0, message: '',
+        targetLang: 'zh-CN', engine: 'tencent', outFmt: ext === 'pdf' ? 'html' : (ext === 'docx' ? 'docx' : ext === 'txt' || ext === 'md' ? 'txt' : 'html')
+      });
+    }
+    renderFiles();
+  }
+
+  function renderFiles() {
+    if (!state.files.length) { listEl.innerHTML = ''; return; }
+    listEl.innerHTML = state.files.map(f => `
+      <div class="file-item" data-id="${f.id}">
+        <div class="file-info">
+          <div class="file-name">${escapeHtml(f.name)} <span style="font-weight:400;color:#94a3b8;font-size:0.75rem">${bytes(f.file.size)}</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${f.progress}%"></div></div>
+          <div class="stage-hint" data-stage="${f.id}">${escapeHtml(f.message || statusText(f.status))}</div>
+        </div>
+        <div class="file-actions">
+          <select class="lang-select" data-id="${f.id}">
+            ${[['zh-CN', '中文'], ['en', 'English'], ['ja', '日本語'], ['ko', '한국어'], ['fr', 'Français'], ['de', 'Deutsch']]
+        .map(([v, t]) => `<option value="${v}" ${f.targetLang === v ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+          <select class="engine-select" data-id="${f.id}">
+            <option value="tencent" ${f.engine === 'tencent' ? 'selected' : ''}>普通翻译</option>
+            <option value="deepseek" ${f.engine === 'deepseek' ? 'selected' : ''}>AI 智能翻译</option>
+          </select>
+          <select class="fmt-select" data-id="${f.id}">
+            ${Object.keys(OUT_FMT).map(k => `<option value="${k}" ${f.outFmt === k ? 'selected' : ''}>输出：${OUT_FMT[k]}</option>`).join('')}
+          </select>
+          <button class="btn btn-primary btn-sm process-btn" data-id="${f.id}" ${f.status === 'running' ? 'disabled' : ''}>▶ 翻译</button>
+          <button class="btn btn-danger btn-sm delete-btn" data-id="${f.id}">🗑</button>
+        </div>
+      </div>`).join('');
+  }
+
+  function statusText(s) {
+    return { pending: '等待翻译', running: '处理中…', done: '完成', error: '失败' }[s] || s;
+  }
+  function setStage(f) {
+    const el = document.querySelector(`[data-stage="${f.id}"]`);
+    if (el) el.textContent = f.message || statusText(f.status);
+    const bar = document.querySelector(`.file-item[data-id="${f.id}"] .progress-fill`);
+    if (bar) bar.style.width = f.progress + '%';
+  }
+
+  listEl.addEventListener('change', e => {
+    const id = parseInt(e.target.dataset.id, 10);
+    const f = state.files.find(x => x.id === id);
+    if (!f) return;
+    if (e.target.classList.contains('lang-select')) f.targetLang = e.target.value;
+    if (e.target.classList.contains('engine-select')) f.engine = e.target.value;
+    if (e.target.classList.contains('fmt-select')) f.outFmt = e.target.value;
+  });
+  listEl.addEventListener('click', async e => {
+    const id = parseInt(e.target.dataset.id, 10);
+    const f = state.files.find(x => x.id === id);
+    if (!f) return;
+    if (e.target.classList.contains('delete-btn')) { state.files = state.files.filter(x => x.id !== id); renderFiles(); return; }
+    if (e.target.classList.contains('process-btn')) {
+      e.target.disabled = true;
+      try { await processFile(f); } catch (err) { console.error(err); f.status = 'error'; f.message = '失败：' + err.message; setStage(f); showToast('翻译失败：' + err.message, true); }
+      e.target.disabled = false;
+    }
+  });
+
+  /* ==================== 已完成列表 ==================== */
+  function renderCompleted() {
+    if (!state.completed.length) {
+      completedEl.innerHTML = '<div style="color:#94a3b8; text-align:center; padding:2rem;">暂无完成的文档</div>';
+      return;
+    }
+    completedEl.innerHTML = state.completed.map(f => `
+      <div class="file-item">
+        <i class="fas fa-check-circle" style="color:#10b981;"></i>
+        <div class="file-info">
+          <div class="file-name">${escapeHtml(f.outName)}</div>
+          <div class="stage-hint">${escapeHtml(f.name)} · ${escapeHtml(f.summary || '')}</div>
+        </div>
+        <div class="file-actions">
+          <button class="btn btn-outline btn-sm preview-btn" data-id="${f.id}">预览</button>
+          <button class="btn btn-outline btn-sm dump-btn" data-id="${f.id}">转存 HTML</button>
+          <button class="btn btn-primary btn-sm download-btn2" data-id="${f.id}">下载</button>
+          <button class="btn btn-danger btn-sm remove-completed" data-id="${f.id}">删除</button>
+        </div>
+      </div>`).join('');
+  }
+  completedEl.addEventListener('click', e => {
+    const id = parseInt(e.target.dataset.id, 10);
+    const item = state.completed.find(x => x.id === id);
+    if (!item) return;
+    if (e.target.classList.contains('download-btn2')) download(item.blob, item.outName);
+    if (e.target.classList.contains('preview-btn')) {
+      if (item.html) openHtmlInNewTab(item.html, item.outName);
+      else if (item.blob) download(item.blob, item.outName);
+    }
+    if (e.target.classList.contains('dump-btn')) {
+      const html = item.html || '';
+      if (!html) { showToast('该输出没有 HTML 版本', true); return; }
+      download(new Blob([html], { type: 'text/html;charset=utf-8' }), baseName(item.outName) + '.html');
+    }
+    if (e.target.classList.contains('remove-completed')) {
+      state.completed = state.completed.filter(x => x.id !== id);
+      renderCompleted();
+    }
+  });
+
+  /* ==================== 解析：按格式抽取 IR ==================== */
+  async function extractIR(f, onStage) {
+    const ext = f.ext;
+    if (ext === 'docx') {
+      onStage('解析 Word 结构…');
+      if (!window.mammoth) throw new Error('mammoth 库未加载成功，请检查网络后刷新页面');
+      const buf = await f.file.arrayBuffer();
+      const ir = await dx.extractDocx(buf, { mammoth: window.mammoth, fileName: f.name });
+      ir.meta.fileName = f.name;
+      return ir;
+    }
+    if (ext === 'pdf') {
+      onStage('解析 PDF 版式（分栏/段落/表格）…');
+      if (!window.pdfjsLib) throw new Error('pdf.js 未加载成功，请检查网络后刷新页面');
+      const ir = await px.extractPDF(f.file, {
+        pdfjs: window.pdfjsLib,
+        fileName: f.name,
+        onProgress: (p, total) => onStage(`解析 PDF 第 ${p}/${total} 页…`)
+      });
+      ir.meta.fileName = f.name;
+      return ir;
+    }
+    if (ext === 'txt' || ext === 'md' || ext === 'markdown') {
+      onStage('读取文本…');
+      const text = await f.file.text();
+      const ir = core.newIR({ source: ext, fileName: f.name });
+      ir.meta.fileName = f.name;
+      // Markdown 简单结构化：# 标题 / 段落 / > 引用
+      const lines = text.replace(/\r\n?/g, '\n').split('\n');
+      let i = 0;
+      while (i < lines.length) {
+        const raw = lines[i];
+        const line = raw.trim();
+        if (!line) { i++; continue; }
+        const h = /^(#{1,6})\s+(.*)$/.exec(line);
+        if (h) {
+          ir.blocks.push({ id: core.uid('b'), type: 'heading', level: Math.min(4, h[1].length), runs: [{ t: h[2] }], align: null });
+          i++; continue;
+        }
+        if (line.startsWith('|') && line.split('|').length >= 3) {
+          const rows = [];
+          while (i < lines.length && lines[i].trim().startsWith('|')) {
+            const cells = lines[i].trim().split('|').slice(1, -1).map(c => c.trim());
+            if (!cells.every(c => /^-{2,}$/.test(c) || c === '')) rows.push(cells.map(c => ({ text: c, runs: [{ t: c }], colspan: 1, rowspan: 1 })));
+            i++;
+          }
+          ir.blocks.push({ id: core.uid('t'), type: 'table', rows: rows, headerRows: 1 });
+          continue;
+        }
+        ir.blocks.push({ id: core.uid('b'), type: 'paragraph', runs: [{ t: line }], align: null, indent: null });
+        i++;
+      }
+      ir.bodySize = 10.5;
+      core.applyHeadingLevels(ir, {});
+      return ir;
+    }
+    if (['png', 'jpg', 'jpeg'].includes(ext)) {
+      onStage('OCR 识别图片文字…');
+      if (!window.Tesseract) throw new Error('OCR 组件未加载成功，请检查网络后刷新页面');
+      const worker = await window.Tesseract.createWorker('chi_sim+eng', 1);
+      const { data: { text } } = await worker.recognize(f.file);
+      await worker.terminate();
+      const ir = core.newIR({ source: 'image', fileName: f.name });
+      ir.meta.fileName = f.name;
+      text.split(/\n{1,}/).map(s => s.trim()).filter(Boolean).forEach(line => {
+        ir.blocks.push({ id: core.uid('b'), type: 'paragraph', runs: [{ t: line }], align: line.length < 20 ? 'center' : null, indent: null });
+      });
+      ir.bodySize = 11;
+      return ir;
+    }
+    throw new Error('不支持的格式: ' + ext);
+  }
+
+  /* ==================== 术语库 / 翻译记忆 / 选项 ==================== */
+
+  /** 读取选项（符号保护、翻译记忆） */
+  function loadOptions() {
+    let o = { protectSymbols: true, useTM: true, academicTerms: false };
+    try {
+      const raw = localStorage.getItem(LS_OPTS);
+      if (raw) o = Object.assign(o, JSON.parse(raw));
+    } catch (e) { }
+    return o;
+  }
+  function saveOptions(o) {
+    try { localStorage.setItem(LS_OPTS, JSON.stringify(o)); } catch (e) { }
+  }
+
+  /** 术语表持久化 */
+  function loadTermsText() {
+    try { return localStorage.getItem(LS_TERMS) || ''; } catch (e) { return ''; }
+  }
+  function saveTermsText(t) {
+    try { localStorage.setItem(LS_TERMS, t); } catch (e) { }
+    updateToolsSummary();
+  }
+
+  function updateToolsSummary() {
+    const n = gloss.parseTerms($('termsText').value).length;
+    const s = tmMod.TM.stats();
+    $('toolsSummary').textContent = `术语 ${n} 条 · 记忆 ${s.entries} 段（复用 ${s.hits} 次）`;
+  }
+  function refreshTMStats() {
+    const s = tmMod.TM.stats();
+    $('tmStats').textContent = `${s.entries} 段（命中复用 ${s.hits} 次，其中重复条目 ${s.repeated} 条，上限 ${s.max}）`;
+    updateToolsSummary();
+  }
+
+  /** 初始化设置面板 */
+  function initTools() {
+    const o = loadOptions();
+    $('optProtectSymbols').checked = !!o.protectSymbols;
+    $('optUseTM').checked = !!o.useTM;
+    $('termsText').value = loadTermsText();
+    $('appVersion').textContent = VERSION;
+    refreshTMStats();
+
+    /* ---- 翻译服务地址 ---- */
+    const apiInput = $('apiUrlInput');
+    apiInput.value = getApiUrl();
+    const showApiStatus = (text, ok) => {
+      $('apiStatus').textContent = text;
+      $('apiStatus').style.color = ok === true ? '#10b981' : (ok === false ? '#dc2626' : '#94a3b8');
+    };
+    if (apiInput.value) showApiStatus('已配置：' + apiInput.value, null);
+
+    $('saveApiBtn').addEventListener('click', () => {
+      const v = apiInput.value.trim();
+      setApiUrl(v);
+      showApiStatus(v ? '已保存：' + v : '已清空，翻译前请先填写服务地址', v ? true : null);
+      showToast(v ? '服务地址已保存' : '服务地址已清空');
+    });
+    $('testApiBtn').addEventListener('click', async () => {
+      const v = apiUrlOrInput();
+      if (!v) { showApiStatus('请先填写服务地址', false); return; }
+      showApiStatus('正在测试…', null);
+      try {
+        const res = await fetch(v, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: '你好', target: 'en', engine: 'tencent' })
+        });
+        const data = await res.json();
+        if (data && data.code === 0) {
+          showApiStatus('连接正常，返回示例：' + String(data.result).slice(0, 40), true);
+        } else {
+          showApiStatus('服务返回异常：' + ((data && data.result) || '未知错误'), false);
+        }
+      } catch (e) {
+        showApiStatus('无法连接：' + e.message + '（检查地址是否正确、是否允许跨域）', false);
+      }
+    });
+    function apiUrlOrInput() { return ($('apiUrlInput').value || '').trim() || getApiUrl(); }
+
+    $('toggleToolsBtn').addEventListener('click', () => {
+      const p = $('toolsPanel');
+      p.style.display = p.style.display === 'none' ? 'block' : 'none';
+      refreshTMStats();
+    });
+    $('optProtectSymbols').addEventListener('change', e => {
+      const cur = loadOptions(); cur.protectSymbols = e.target.checked; saveOptions(cur);
+    });
+    $('optUseTM').addEventListener('change', e => {
+      const cur = loadOptions(); cur.useTM = e.target.checked; saveOptions(cur);
+    });
+    $('termsText').addEventListener('input', () => saveTermsText($('termsText').value));
+
+    $('loadAcademicTerms').addEventListener('click', async () => {
+      // 优先用内嵌术语库（离线/单文件部署也能用）；取不到再尝试同目录文件
+      let txt = gloss.ACADEMIC_TERMS_TEXT || '';
+      if (!txt) {
+        for (const p of ['./src/glossary-academic.txt', './glossary-academic.txt']) {
+          try {
+            const res = await fetch(p);
+            if (res.ok) { txt = await res.text(); break; }
+          } catch (e) { /* 继续尝试下一个路径 */ }
+        }
+      }
+      if (!txt) { showToast('未能载入内置术语库，请手动粘贴术语', true); return; }
+      const cur = $('termsText').value.trim();
+      $('termsText').value = cur ? (cur + '\n\n' + txt) : txt;
+      saveTermsText($('termsText').value);
+      const n = gloss.parseTerms($('termsText').value).length;
+      showToast(`已载入学术常用术语，当前共 ${n} 条（可自行增删）`);
+    });
+    $('importTermsFile').addEventListener('click', () => $('termsFileInput').click());
+    $('termsFileInput').addEventListener('change', async e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const txt = await f.text();
+      $('termsText').value = txt;
+      saveTermsText(txt);
+      showToast(`已导入术语表：${gloss.parseTerms(txt).length} 条`);
+      e.target.value = '';
+    });
+    $('exportTermsFile').addEventListener('click', () => {
+      const items = gloss.parseTerms($('termsText').value);
+      if (!items.length) { showToast('术语表为空', true); return; }
+      const txt = gloss.serializeTerms(items);
+      download(new Blob(['\uFEFF' + txt], { type: 'text/plain;charset=utf-8' }), '灵译-术语表.txt');
+    });
+
+    $('tmExport').addEventListener('click', () => {
+      const n = tmMod.TM.stats().entries;
+      if (!n) { showToast('翻译记忆还是空的', true); return; }
+      download(new Blob([tmMod.TM.exportJSON()], { type: 'application/json;charset=utf-8' }), '灵译-翻译记忆.json');
+    });
+    $('tmImport').addEventListener('click', () => $('tmFileInput').click());
+    $('tmFileInput').addEventListener('change', async e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = tmMod.TM.importJSON(await f.text(), true);
+      if (r.error) showToast(r.error, true);
+      else showToast(`已导入记忆 ${r.added} 条（跳过 ${r.skipped} 条）`);
+      refreshTMStats();
+      e.target.value = '';
+    });
+    $('tmClear').addEventListener('click', () => {
+      tmMod.TM.clear();
+      refreshTMStats();
+      showToast('翻译记忆已清空');
+    });
+  }
+
+  /* ==================== 主流程 ==================== */
+  async function processFile(f) {
+    f.status = 'running'; f.progress = 5; f.message = '准备中…'; setStage(f);
+
+    const ir = await extractIR(f, (msg) => { f.message = msg; setStage(f); });
+    const blockCount = (function count(bs) {
+      let n = 0;
+      for (const b of bs) {
+        if (b.type === 'container') n += count(b.columns.reduce((a, g) => a.concat(g.blocks || []), []));
+        else n++;
+      }
+      return n;
+    })(ir.blocks);
+    if (!blockCount) throw new Error('没有解析到任何内容（可能是扫描件，请改用图片模式）');
+    const settings = loadOptions();
+    const apiUrl = getApiUrl();
+    if (!apiUrl) {
+      $('toolsPanel').style.display = 'block';
+      $('apiUrlInput').focus();
+      throw new Error('还没有配置翻译服务地址：请在「翻译服务设置」里填入你的云函数 URL（见 README 第四节）');
+    }
+    f.progress = 30;
+    f.message = `解析完成：${blockCount} 个内容块` +
+      (settings.protectSymbols ? '，已启用符号保护' : '') +
+      (settings.useTM ? '，已启用翻译记忆' : '') + '，开始翻译…';
+    setStage(f);
+
+    const terms = gloss.parseTerms($('termsText').value);
+    const result = await tr.translateIR(ir, {
+      apiUrl: apiUrl,
+      target: f.targetLang,
+      engine: f.engine,
+      mode: f.engine === 'deepseek' ? 'polish' : 'normal',
+      terms: terms,
+      useTM: settings.useTM,
+      protectSymbols: settings.protectSymbols,
+      onProgress: (done, total, msg) => {
+        f.progress = 30 + Math.round(done / Math.max(1, total) * 55);
+        f.message = msg;
+        setStage(f);
+      }
+    });
+    refreshTMStats();
+    f.progress = 90;
+    f.message = `翻译完成（成功 ${result.translated} 段 · 记忆复用 ${result.fromCache} 段 · 保留原文 ${result.fallback} 段` +
+      ` · 保护 ${result.symbols} 个符号 / 套用 ${result.termsApplied} 处术语），正在生成文件…`;
+    setStage(f);
+    if (result.missingSymbols && result.missingSymbols.length) {
+      showToast(`提示：有 ${result.missingSymbols.length} 个符号占位符被翻译引擎改动，已尽量还原`, true);
+    }
+
+    const outBase = baseName(f.name) + '-灵译-' + (f.targetLang === 'zh-CN' ? '中文' : f.targetLang.toUpperCase());
+    const opts = { title: outBase, bodySize: ir.bodySize, fileName: outBase };
+    let blob, outName, html = null;
+
+    if (f.outFmt === 'docx') {
+      if (!window.docx) throw new Error('docx 库未加载成功，请检查网络后刷新页面');
+      const r = await rd.renderDocx(ir, Object.assign({ docx: window.docx, fileName: outBase }, opts));
+      blob = r.blob; outName = r.filename;
+      html = rh.renderDocument(ir, opts);
+    } else if (f.outFmt === 'pdf') {
+      html = rh.renderDocument(ir, opts);
+      blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      outName = outBase + '.html';
+      openHtmlInNewTab(html, outName);
+      showToast('已在新窗口打开：请在打印对话框中选择「另存为 PDF」', false);
+    } else if (f.outFmt === 'bilingual') {
+      html = rh.renderBilingualDocument(ir, opts);
+      blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      outName = outBase + '-对照.html';
+      openHtmlInNewTab(html, outName);
+    } else if (f.outFmt === 'html') {
+      html = rh.renderDocument(ir, opts);
+      blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      outName = outBase + '.html';
+      openHtmlInNewTab(html, outName);
+    } else {
+      const text = rh.renderText(ir, opts);
+      blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
+      outName = outBase + '.txt';
+    }
+
+    f.status = 'done'; f.progress = 100; f.message = '完成';
+    state.files = state.files.filter(x => x.id !== f.id);
+    state.completed.push({
+      id: f.id, name: f.name, outName: outName, blob: blob, html: html,
+      summary: `成功 ${result.translated} 段 / 保留 ${result.fallback} 段`
+    });
+    addRecord(f, outName);
+    renderFiles(); renderCompleted();
+    showToast('翻译完成：' + outName);
+    if (f.outFmt === 'docx' || f.outFmt === 'txt') download(blob, outName);
+  }
+
+  /* ==================== 用户与记录 ==================== */
+  function loadUsers() { try { return JSON.parse(localStorage.getItem('lingyi_users') || '{}'); } catch (e) { return {}; } }
+  function saveUsers(u) { localStorage.setItem('lingyi_users', JSON.stringify(u)); }
+  function loadRecords() { try { return JSON.parse(localStorage.getItem('lingyi_records') || '[]'); } catch (e) { return []; } }
+  function saveRecords(r) { localStorage.setItem('lingyi_records', JSON.stringify(r)); }
+  function cleanRecords(r) { const d = 30 * 24 * 3600 * 1000; return r.filter(x => Date.now() - x.timestamp < d); }
+  function addRecord(f, outName) {
+    if (!state.currentUser) return;
+    const rs = loadRecords();
+    rs.push({ username: state.currentUser.username, filename: f.name, output: outName, target: f.targetLang, engine: f.engine, timestamp: Date.now() });
+    saveRecords(cleanRecords(rs));
+  }
+  function updateLoginUI() {
+    const u = state.currentUser;
+    $('loginStatus').textContent = u ? (u.isAdmin ? '👑 管理员' : '👤 ' + u.username) : '';
+    $('loginBtn').style.display = u ? 'none' : 'inline-flex';
+    $('historyBtn').style.display = u ? 'inline-flex' : 'none';
+    $('logoutBtn').style.display = u ? 'inline-flex' : 'none';
+  }
+  function login(username, password) {
+    if (username === '' && password === 'A123666') {
+      state.currentUser = { username: 'admin', isAdmin: true };
+      updateLoginUI(); showToast('管理员登录成功'); return true;
+    }
+    if (!username.trim()) { showToast('账号不能为空', true); return false; }
+    const users = loadUsers();
+    if (users[username]) {
+      if (users[username].password !== password) { showToast('密码错误', true); return false; }
+    } else {
+      users[username] = { password };
+      saveUsers(users);
+    }
+    state.currentUser = { username, isAdmin: false };
+    updateLoginUI();
+    showToast('欢迎，' + username);
+    return true;
+  }
+  $('loginBtn').addEventListener('click', () => $('loginModal').classList.add('active'));
+  $('closeLoginModal').addEventListener('click', () => $('loginModal').classList.remove('active'));
+  $('doLoginBtn').addEventListener('click', () => {
+    if (login($('loginUsername').value.trim(), $('loginPassword').value.trim())) {
+      $('loginModal').classList.remove('active');
+      $('loginUsername').value = ''; $('loginPassword').value = '';
+    }
+  });
+  $('logoutBtn').addEventListener('click', () => {
+    state.currentUser = null; state.completed = [];
+    updateLoginUI(); renderCompleted(); showToast('已退出登录');
+  });
+  $('historyBtn').addEventListener('click', () => {
+    const rs = cleanRecords(loadRecords()).filter(r => !state.currentUser || r.username === state.currentUser.username).reverse();
+    $('historyList').innerHTML = rs.length ? rs.map(r => `
+      <div style="padding:0.5rem 0; border-bottom:1px dashed #e2e8f0; font-size:0.85rem;">
+        <div style="font-weight:600;">${escapeHtml(r.filename)}</div>
+        <div style="color:#64748b; font-size:0.75rem;">${new Date(r.timestamp).toLocaleString()} · ${escapeHtml(r.output || '')}</div>
+      </div>`).join('') : '<div style="color:#94a3b8;">暂无记录</div>';
+    $('historyModal').classList.add('active');
+  });
+  $('closeHistoryModal').addEventListener('click', () => $('historyModal').classList.remove('active'));
+
+  /* ==================== 二维码 ==================== */
+  try {
+    if (window.QRCode) {
+      new QRCode($('qrContainer'), { text: location.href, width: 36, height: 36, colorDark: '#1e293b', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
+      $('qrSection').addEventListener('click', () => {
+        $('qrLargeContainer').innerHTML = '';
+        new QRCode($('qrLargeContainer'), { text: location.href, width: 200, height: 200, colorDark: '#1e293b', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+        $('qrZoomModal').classList.add('active');
+      });
+      $('closeQrZoom').addEventListener('click', () => $('qrZoomModal').classList.remove('active'));
+      $('qrZoomModal').addEventListener('click', e => { if (e.target === $('qrZoomModal')) $('qrZoomModal').classList.remove('active'); });
+    }
+  } catch (e) { console.warn('二维码生成失败', e); }
+
+  /* ==================== 微信环境提示 ==================== */
+  if (/MicroMessenger/i.test(navigator.userAgent)) {
+    document.querySelectorAll('.mobile-warning').forEach(el => el.style.display = 'block');
+  }
+
+  updateLoginUI();
+  initTools();
+  renderFiles();
+  renderCompleted();
+})();
+</script>
+</body>
+</html>

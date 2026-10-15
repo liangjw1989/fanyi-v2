@@ -1,0 +1,16 @@
+# GitHub 上传用：统一换行与字符集，避免中文文件名在某些系统上显示成乱码
+* text=auto eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.py    text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+*.docx  binary
+*.pdf   binary
+*.png   binary
+*.jpg   binary
