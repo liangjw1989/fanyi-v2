@@ -33,6 +33,7 @@ $include = @(
   'NOTICE.md',
   'config.js',
   'docs',
+  'deploy',
   '.gitattributes',
   'upload-to-github.bat',
   'push-to-github.bat',

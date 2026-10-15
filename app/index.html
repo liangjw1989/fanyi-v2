@@ -405,8 +405,9 @@
         .map(([v, t]) => `<option value="${v}" ${f.targetLang === v ? 'selected' : ''}>${t}</option>`).join('')}
           </select>
           <select class="engine-select" data-id="${f.id}">
-            <option value="tencent" ${f.engine === 'tencent' ? 'selected' : ''}>普通翻译</option>
-            <option value="deepseek" ${f.engine === 'deepseek' ? 'selected' : ''}>AI 智能翻译</option>
+            <option value="tencent" ${f.engine === 'tencent' ? 'selected' : ''}>普通翻译（腾讯云）</option>
+            <option value="baidu" ${f.engine === 'baidu' ? 'selected' : ''}>普通翻译（百度 · 免费额度大）</option>
+            <option value="deepseek" ${f.engine === 'deepseek' ? 'selected' : ''}>AI 智能翻译（DeepSeek）</option>
           </select>
           <select class="fmt-select" data-id="${f.id}">
             ${Object.keys(OUT_FMT).map(k => `<option value="${k}" ${f.outFmt === k ? 'selected' : ''}>输出：${OUT_FMT[k]}</option>`).join('')}
