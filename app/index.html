@@ -384,7 +384,14 @@
       state.files.push({
         id: state.nextId++, file: f, name: f.name, ext: ext,
         status: 'pending', progress: 0, message: '',
-        targetLang: 'zh-CN', engine: 'tencent', outFmt: ext === 'pdf' ? 'html' : (ext === 'docx' ? 'docx' : ext === 'txt' || ext === 'md' ? 'txt' : 'html')
+        targetLang: DEPLOY_CONFIG.DEFAULT_TARGET || 'zh-CN',
+        engine: DEPLOY_CONFIG.DEFAULT_ENGINE || 'tencent',
+        /* 默认输出格式：优先用 config.js 的 DEFAULT_OUT_FMT；
+           未配置时 PDF/DOCX 一律默认 Word —— Word 的版式还原最完整，
+           且可以直接编辑；想输出网页/对照随时在下拉框里改。 */
+        outFmt: DEPLOY_CONFIG.DEFAULT_OUT_FMT ||
+          ((ext === 'pdf' || ext === 'docx') ? 'docx'
+            : (ext === 'txt' || ext === 'md') ? 'txt' : 'docx')
       });
     }
     renderFiles();

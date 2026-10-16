@@ -36,6 +36,10 @@
 
   const TM = tmMod ? tmMod.TM : null;
 
+  /** 引擎是否会保留分段标记的记忆（key = apiUrl + '|' + engine）
+   *  true = 会保留（可批量）；false = 会改动（只能逐段）。会话内有效。 */
+  const ENGINE_MARKER_RELIABLE = {};
+
   /* ==========================================================================
    * 传输层标记：⟦…⟧ 与引擎之间必须换一种"引擎不会吃掉"的写法
    * --------------------------------------------------------------------------
@@ -203,7 +207,7 @@
     }
 
     /* ---- 2) 按保护后的长度分批 ---- */
-    const batches = core.buildBatches(todo.map(u => ({ text: u.payload, ref: u })), opts.maxChars || 2600);
+    const batches = core.buildBatches(todo.map(u => ({ text: u.payload, ref: u })), opts.maxChars || 4000);
 
     const system = buildSystemPrompt(opts.target, opts.mode);
     const engine = opts.engine || 'tencent';
@@ -219,7 +223,18 @@
      * mode='safe' 时跳过批量，直接逐段（最稳，但调用次数=片段数）
      */
     const safeMode = opts.mode === 'safe';
-    let reliable = !safeMode;
+    /* 引擎可靠性记忆：同一个"地址+引擎"组合只要证明过会破坏标记，
+     * 之后的文档直接走逐段，不必再从头踩一遍坑（这是"翻译偏慢"的主因之一）。 */
+    const relKey = String(opts.apiUrl || '') + '|' + String(engine);
+    const knownBad = ENGINE_MARKER_RELIABLE[relKey] === false;
+    let reliable = !safeMode && !knownBad;
+    if (safeMode || knownBad) {
+      if (opts.onProgress) {
+        opts.onProgress(0, units.length, safeMode
+          ? '安全模式：逐段翻译（最稳）'
+          : '该引擎已知会改动分段标记，直接逐段翻译（更稳）');
+      }
+    }
     let consecutiveLoss = 0;
 
     let done = stat.fromCache;
@@ -230,7 +245,10 @@
         (a, x) => a + 2 + ((x.ref && x.ref.items) ? x.ref.items.length : 0), 0);
       let payloads = null;
       let attempt = 0;
-      const retries = reliable ? (opts.retries == null ? 2 : opts.retries) : 0;
+      /* 重试次数：批量失败时的重试是有价值的（实测随机性），但不宜多。
+       * 因为"标记+占位符紧邻"（##V0####P0##）这种形态丢标记概率明显更高，
+       * 反复重试只会白等，所以默认只重试 1 次。 */
+      const retries = reliable ? (opts.retries == null ? 1 : opts.retries) : 0;
       let lostMarkers = false;
 
       while (reliable && attempt <= retries && !payloads) {
@@ -240,7 +258,8 @@
             engine: engine, system: system, fetchImpl: opts.fetchImpl
           });
           stat.calls++;
-          /* 标记少了 → 引擎破坏了结构，这一批不可信，直接换逐段翻译 */
+          /* 标记少了 → 这一批不可信。注意：实测丢失是随机的（同一批重发多数能好），
+           * 所以先重试同一批；只有反复失败才降级为逐段翻译。 */
           if (wantMarkers > 0 && listMarkers(raw).length < wantMarkers) {
             stat.markerLoss++;
             lostMarkers = true;
@@ -257,15 +276,23 @@
 
       if (lostMarkers) {
         consecutiveLoss++;
-        if (consecutiveLoss >= 2 && reliable) {
+        /* 实测：标记丢失是"随机"的，同一批重发多数能成功（10/10 通过）。
+         * 所以策略是"批量为主、重试纠正"：
+         *   · 单批重试仍失败 → 只把这一批降级为逐段，继续尝试批量翻译（快）
+         *   · 累计失败批次过多 → 才判定该引擎整体不可靠，后续全逐段
+         * 这样既不牺牲速度，也不会丢符号。 */
+        const giveUp = opts.batchLossLimit == null ? 2 : opts.batchLossLimit;
+        if (consecutiveLoss >= giveUp && reliable) {
           reliable = false;
+          ENGINE_MARKER_RELIABLE[relKey] = false;
           if (opts.onProgress) {
             opts.onProgress(done, units.length,
-              '检测到当前引擎会破坏分段标记，后续改为逐段翻译（更稳，速度稍慢）');
+              '当前引擎较易改动分段标记，后续改为逐段翻译（更稳，速度稍慢）');
           }
         }
       } else if (payloads) {
         consecutiveLoss = 0;
+        if (ENGINE_MARKER_RELIABLE[relKey] === undefined) ENGINE_MARKER_RELIABLE[relKey] = true;
       }
 
       if (!payloads) {

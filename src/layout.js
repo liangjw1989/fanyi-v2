@@ -364,14 +364,33 @@
     // 表格特征：大多数行都是多列，且每格文字较短（正文的"大空白"不是这样）
     const multiCount = rowsCells.filter(c => c.length >= minCols).length;
     if (multiCount < Math.ceil(rowsCells.length * 0.75)) return null;
-    let totalCells = 0, longCells = 0;
+    let totalCells = 0, longCells = 0, sentenceCells = 0, maxCellLen = 0;
     for (const cells of rowsCells) {
       for (const c of cells) {
+        const txt = c.map(x => x.str).join('').trim();
         totalCells++;
-        if (c.map(x => x.str).join('').trim().length > 22) longCells++;
+        if (txt.length > 22) longCells++;
+        // 以句读结尾且有一定长度 → 典型"正文片段"，而不是"表格单元格"
+        if (txt.length >= 12 && /[.。；;，,、：:]$/.test(txt)) sentenceCells++;
+        if (txt.length > maxCellLen) maxCellLen = txt.length;
       }
     }
     if (totalCells && longCells / totalCells > 0.35) return null;
+
+    /* ------------------------------------------------------------------
+     * 正文防误判：两栏页面的文字被拍平后，极易被当成"两列的表格"。
+     * 真实论文表格的格子通常是短词、数字、区间、P 值；出现下列情况
+     * 基本可断定是正文：
+     *   · 有"以句读结尾的长片段"（整句被当成了单元格）
+     *   · 单个格子特别长（超过约 1/4 行宽的文字）
+     *   · 行数过多（表格极少连续几十行，正文才会）
+     * 宁可把表格当正文（少动原稿），也不要把正文当表格（整页被拆碎）。
+     * ------------------------------------------------------------------ */
+    if (opts.strictProse !== false) {
+      if (totalCells && sentenceCells / totalCells > 0.20) return null;
+      if (maxCellLen > (opts.maxCellChars || 42)) return null;
+      if (rowsCells.length > (opts.maxTableRows || 80)) return null;
+    }
 
     // 列边界聚类：用所有单元格的左边界
     const lefts = [];
