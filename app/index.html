@@ -198,6 +198,23 @@
 
       <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
 
+      <div style="font-weight:600; margin-bottom:0.4rem;">🧪 排版不满意？导出诊断报告</div>
+      <div style="font-size:0.78rem; color:#64748b; margin-bottom:0.4rem;">
+        翻译完成后点下面的按钮，会下载一份 JSON：包含 PDF 每页的
+        <b>文字坐标、分栏推断、块结构</b>。把它发给开发者，就能精确定位
+        「是文字层的问题」还是「版式推断的问题」。
+        <b>报告里不含任何密钥</b>。
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-bottom:0.5rem;">
+        <button class="btn btn-outline btn-sm" id="exportDiagBtn">⬇ 导出诊断报告（JSON）</button>
+        <button class="btn btn-outline btn-sm" id="exportDiagTextBtn">⬇ 导出可读摘要（TXT）</button>
+      </div>
+      <div id="diagStatus" style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.6rem;">
+        提示：需要先翻译（或至少解析）过一个文件。
+      </div>
+
+      <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
+
       <div style="font-weight:600; margin-bottom:0.6rem;">🛡️ 翻译质量控制</div>
 
       <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin-bottom:0.4rem;">
@@ -294,6 +311,7 @@
 <script src="./src/render-html.js"></script>
 <script src="./src/render-docx.js"></script>
 <script src="./src/glossary.js"></script>
+<script src="./src/diagnostics.js"></script>
 <script src="./src/tm.js"></script>
 <script src="./src/translate.js"></script>
 
@@ -308,6 +326,7 @@
   const tr = window.LingyiTranslate;
   const gloss = window.LingyiGlossary;
   const tmMod = window.LingyiTM;
+  const diag = window.LingyiDiagnostics;
 
   /* ==================== 配置 ====================
    * 安全要点：这里只保存"云函数地址"，绝不保存任何密钥。
@@ -732,6 +751,49 @@
       refreshTMStats();
       showToast('翻译记忆已清空');
     });
+
+    /* ---- 诊断报告导出 ---- */
+    function collectDiag() {
+      const withIr = state.completed.concat(state.files).filter(x => x && x._ir);
+      const last = withIr.length ? withIr[withIr.length - 1] : null;
+      if (!last) {
+        const anyRun = state.completed.filter(x => x && x.name);
+        return { error: '还没有可诊断的解析结果。请先上传并翻译（或至少让它解析）一个文件。', hint: anyRun.length };
+      }
+      const report = diag.build(last._ir, {
+        version: VERSION,
+        fileName: last.name,
+        fileType: (last._meta && last._meta.fileType) || last.ext,
+        engine: last._meta && last._meta.engine,
+        target: last._meta && last._meta.target
+      });
+      return { report: report, name: last.name };
+    }
+    function downloadText(text, filename, mime) {
+      const blob = new Blob([text], { type: (mime || 'text/plain') + ';charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+    }
+    $('exportDiagBtn').addEventListener('click', () => {
+      const r = collectDiag();
+      if (r.error) { $('diagStatus').textContent = r.error; showToast(r.error, true); return; }
+      const json = JSON.stringify(r.report, null, 2);
+      downloadText(json, baseName(r.name) + '-诊断报告.json', 'application/json');
+      $('diagStatus').textContent = '已导出 JSON（' + Math.round(json.length / 1024) + ' KB）：块 ' +
+        r.report.summary.blockCount + ' 个，页 ' + r.report.file.pages + ' 页';
+      showToast('诊断报告已下载，请把它发给开发者');
+    });
+    $('exportDiagTextBtn').addEventListener('click', () => {
+      const r = collectDiag();
+      if (r.error) { $('diagStatus').textContent = r.error; showToast(r.error, true); return; }
+      const txt = diag.toText(r.report);
+      downloadText(txt, baseName(r.name) + '-诊断摘要.txt', 'text/plain');
+      $('diagStatus').textContent = '已导出可读摘要（' + Math.round(txt.length / 1024) + ' KB）';
+      showToast('可读摘要已下载');
+    });
   }
 
   /* ==================== 主流程 ==================== */
@@ -739,6 +801,10 @@
     f.status = 'running'; f.progress = 5; f.message = '准备中…'; setStage(f);
 
     const ir = await extractIR(f, (msg) => { f.message = msg; setStage(f); });
+    /* 保留解析结果：排版不满意时可一键导出诊断报告（含坐标与块结构），
+       用来区分"文字层本身有问题"还是"版式推断有问题"。 */
+    f._ir = ir;
+    f._meta = { engine: f.engine, target: f.targetLang, fileType: f.ext };
     const blockCount = (function count(bs) {
       let n = 0;
       for (const b of bs) {

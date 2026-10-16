@@ -23,9 +23,9 @@ console.log('语法检查：通过 ' + ok + ' 个，失败 ' + bad + ' 个');
 
 /* 必需模块是否都在（打包版看内联，源码版看 ./src/ 引用） */
 const MODULES = ['core.js', 'layout.js', 'docx-extract.js', 'pdf-extract.js', 'render-html.js',
-  'render-docx.js', 'glossary.js', 'tm.js', 'translate.js'];
+  'render-docx.js', 'glossary.js', 'diagnostics.js', 'tm.js', 'translate.js'];
 const NAMES = ['LingyiCore', 'LingyiLayout', 'LingyiDocx', 'LingyiPdfExtract', 'LingyiRenderHtml',
-  'LingyiRenderDocx', 'LingyiGlossary', 'LingyiTM', 'LingyiTranslate'];
+  'LingyiRenderDocx', 'LingyiGlossary', 'LingyiDiagnostics', 'LingyiTM', 'LingyiTranslate'];
 let missingModule = 0;
 if (useDist) {
   NAMES.forEach((n, i) => {
@@ -55,7 +55,8 @@ const ids = ['translateFileInput', 'translateUpload', 'translateFileList', 'comp
   'qrSection', 'qrContainer', 'qrZoomModal', 'closeQrZoom', 'qrLargeContainer',
   'toggleToolsBtn', 'toolsPanel', 'termsText', 'optProtectSymbols', 'optUseTM',
   'tmStats', 'tmExport', 'tmImport', 'tmClear', 'loadAcademicTerms',
-  'apiUrlInput', 'saveApiBtn', 'testApiBtn', 'apiStatus'];
+  'apiUrlInput', 'saveApiBtn', 'testApiBtn', 'apiStatus',
+  'exportDiagBtn', 'exportDiagTextBtn', 'diagStatus'];
 const missing = ids.filter(id => !new RegExp('id="' + id + '"').test(html));
 console.log('DOM id 检查：缺失 ' + (missing.length ? missing.join(', ') : '无'));
 process.exit(bad || missing.length || missingModule ? 1 : 0);

@@ -15,6 +15,7 @@ const SUITES = [
   ['glossary.test.js', '术语库 · 符号保护 · 翻译记忆'],
   ['real-docx.test.js', '真实 Word 稿结构还原'],
   ['real-pdf.test.js', '真实 PDF 双栏版式还原'],
+  ['diagnostics.test.js', '诊断报告（坐标/分栏/块结构）'],
   ['merge-table.test.js', '表格碎片合并（PDF 表格还原）'],
   ['docx-columns.test.js', 'Word 分栏节生成'],
   ['docx-real.test.js', '真实 docx 库验证（分栏/字号/缩进/表格 XML）'],

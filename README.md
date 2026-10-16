@@ -49,7 +49,7 @@ src/                        核心模块
   translate.js              翻译流水线（记忆 → 术语 → 保护 → 引擎 → 还原）
   glossary-academic.txt      内置学术/医学术语库（可自行增删）
 config.js                   部署配置（只放云函数地址，不含任何密钥）
-docs/                       中文文档（使用说明 / 上传排错 / 后端接口约定 / 部署与百度翻译 / 标记与限流实测 / 翻译顺序与速度 / PDF输出的限制）
+docs/                       中文文档（使用说明 / 上传排错 / 后端接口约定 / 部署与百度翻译 / 标记与限流实测 / 翻译顺序与速度 / PDF输出的限制 / 如何导出诊断报告）
 build.js                    打包：app + src → dist/index.html（含版权水印与构建指纹）
 run-tests.js                一键跑全部测试
 make-repo.ps1               生成"可直接上传 GitHub"的干净目录

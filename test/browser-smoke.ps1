@@ -61,6 +61,7 @@ $checks = [ordered]@{
       'LingyiRenderDocx', 'LingyiGlossary', 'LingyiTM', 'LingyiTranslate') |
       Where-Object { -not ($dom -match $_) }).Count -eq 0
   '术语库面板存在'         = ($dom -match 'termsText') -and ($dom -match 'loadAcademicTerms')
+  '诊断导出按钮存在'       = ($dom -match 'exportDiagBtn') -and ($dom -match 'LingyiDiagnostics')
 }
 $bad = 0
 foreach ($k in $checks.Keys) {

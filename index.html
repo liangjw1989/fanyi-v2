@@ -204,6 +204,23 @@
 
       <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
 
+      <div style="font-weight:600; margin-bottom:0.4rem;">🧪 排版不满意？导出诊断报告</div>
+      <div style="font-size:0.78rem; color:#64748b; margin-bottom:0.4rem;">
+        翻译完成后点下面的按钮，会下载一份 JSON：包含 PDF 每页的
+        <b>文字坐标、分栏推断、块结构</b>。把它发给开发者，就能精确定位
+        「是文字层的问题」还是「版式推断的问题」。
+        <b>报告里不含任何密钥</b>。
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-bottom:0.5rem;">
+        <button class="btn btn-outline btn-sm" id="exportDiagBtn">⬇ 导出诊断报告（JSON）</button>
+        <button class="btn btn-outline btn-sm" id="exportDiagTextBtn">⬇ 导出可读摘要（TXT）</button>
+      </div>
+      <div id="diagStatus" style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.6rem;">
+        提示：需要先翻译（或至少解析）过一个文件。
+      </div>
+
+      <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
+
       <div style="font-weight:600; margin-bottom:0.6rem;">🛡️ 翻译质量控制</div>
 
       <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin-bottom:0.4rem;">
@@ -2631,7 +2648,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.3.0 | sha256:3800f13a0d797862 | 2026-10-16 -->
+<!-- build: v2.3.0 | sha256:61a982fe7f1f1c1e | 2026-10-16 -->
 </body></html>`;
   }
 
@@ -3352,6 +3369,205 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
 });
 
 </script>
+<!-- ==================== diagnostics.js ==================== -->
+<script>
+/* diagnostics.js — 导出"解析结构 + 版式判断"诊断报告，用于远程定位排版问题
+ * © 2026 灵译 LingYi · 个人使用免费，商业使用需授权（见 LICENSE）
+ * ----------------------------------------------------------------------------
+ * 为什么需要它：PDF 没有段落/分栏/表格的语义，只能靠坐标推断。
+ * 出问题时（句子被截断、顺序错乱、表格碎裂），必须看到"pdf.js 实际给出的
+ * 坐标 + 我们推断出的块结构"才能定位。这个模块把这两部分一起导出成 JSON，
+ * 用户下载后发给开发者即可复现问题。
+ *
+ * 报告内容（不含原文以外的新信息，也不含密钥）：
+ *   · 每页尺寸与行数、每行坐标与文字
+ *   · 每页推断出的分栏走廊
+ *   · 每个块的类型、字号、对齐、缩进、文字（截断）
+ *   · 表格的行列规格
+ */
+(function (root, factory) {
+  const mod = factory(
+    typeof require === 'function' ? require('./core.js') : root.LingyiCore
+  );
+  if (typeof module === 'object' && module.exports) module.exports = mod;
+  root.LingyiDiagnostics = mod;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (core) {
+  'use strict';
+
+  const MAX_TEXT = 220;
+
+  function clip(s) {
+    const t = String(s == null ? '' : s);
+    return t.length > MAX_TEXT ? t.slice(0, MAX_TEXT) + '…(' + t.length + '字)' : t;
+  }
+
+  /** 把一个 IR 块描述成可读的摘要（对异常结构保持健壮，绝不抛错） */
+  function describeBlock(b, i) {
+    if (!b || typeof b !== 'object') return { i: i, type: '(空块)' };
+    const base = { i: i, type: b.type || '(无类型)' };
+    if (b.type === 'table') {
+      const rows = b.rows || [];
+      base.table = {
+        rows: rows.length,
+        cols: (rows[0] || []).length,
+        colCounts: rows.slice(0, 12).map(r => (r || []).length),
+        firstRow: (rows[0] || []).map(c => clip((c && c.text) || '')).slice(0, 8),
+        sample: rows.slice(0, 3).map(r => (r || []).map(c => clip((c && c.text) || '')).slice(0, 6))
+      };
+      return base;
+    }
+    if (b.type === 'container') {
+      const cols = (b.columns || []).filter(g => g && typeof g === 'object');
+      base.columns = (b.columns || []).length;
+      base.columnX = (b.columns || []).map(g => (g && g.x != null) ? Math.round(g.x) : null);
+      base.blocks = [];
+      cols.forEach((g, ci) => {
+        (g.blocks || []).filter(Boolean).slice(0, 40).forEach((cb, bi) => {
+          if (cb.type === 'table') {
+            base.blocks.push({ col: ci, i: bi, type: 'table', rows: (cb.rows || []).length, cols: ((cb.rows || [])[0] || []).length });
+            return;
+          }
+          base.blocks.push({
+            col: ci, i: bi, type: cb.type,
+            size: cb.size, align: cb.align, indent: cb.indent,
+            text: clip(core.runsToText(cb.runs || []))
+          });
+        });
+      });
+      return base;
+    }
+    base.size = b.size;
+    base.align = b.align;
+    base.indent = b.indent;
+    base.bold = !!b.bold;
+    if (b.type === 'image') { base.caption = clip(b.caption || ''); base.w = b.w; base.h = b.h; return base; }
+    base.text = clip(core.runsToText(b.runs || []));
+    return base;
+  }
+
+  /** 递归统计各类块的数量（含容器内部） */
+  function countTypes(blocks, acc) {
+    acc = acc || {};
+    for (const b of (blocks || [])) {
+      if (!b || typeof b !== 'object') continue;
+      acc[b.type || '(无类型)'] = (acc[b.type || '(无类型)'] || 0) + 1;
+      if (b.type === 'container') {
+        (b.columns || []).filter(Boolean).forEach(g => countTypes(g.blocks, acc));
+      }
+    }
+    return acc;
+  }
+
+  /**
+   * 生成诊断报告
+   * @param {Object} ir  解析出的 IR
+   * @param {Object} extra { fileName, version, pageLines, corridors, engine, target }
+   * @returns {Object} 可直接 JSON.stringify 的报告
+   */
+  function build(ir, extra) {
+    const e = extra || {};
+    ir = ir || {};
+    const blocks = (ir.blocks || []).filter(Boolean).map(describeBlock);
+    const stats = countTypes(ir.blocks);
+    const sizeHist = {};
+    const alignHist = {};
+    (function walk(bs) {
+      for (const b of (bs || [])) {
+        if (!b || typeof b !== 'object') continue;
+        if (b.size) sizeHist[b.size] = (sizeHist[b.size] || 0) + 1;
+        const k = b.align || '(未设置)';
+        alignHist[k] = (alignHist[k] || 0) + 1;
+        if (b.type === 'container') {
+          (b.columns || []).filter(Boolean).forEach(g => walk(g.blocks));
+        }
+      }
+    })(ir.blocks);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      app: { name: '灵译 LingYi', version: e.version || '?' },
+      file: {
+        name: e.fileName || (ir.meta && ir.meta.fileName) || '?',
+        type: e.fileType || (ir.meta && ir.meta.source) || '?',
+        pages: (ir.pages || []).length || 1
+      },
+      translate: { engine: e.engine || null, target: e.target || null },
+      summary: {
+        blockCount: (ir.blocks || []).length,
+        byType: stats,
+        bodySize: ir.bodySize,
+        sizeHistogram: sizeHist,
+        alignHistogram: alignHist,
+        pageSize: ir.page ? { w: Math.round(ir.page.width), h: Math.round(ir.page.height), margins: ir.page.margins } : null
+      },
+      /* 每页的行与分栏走廊（判断"阅读顺序错乱"的关键证据） */
+      pages: (ir.pages || []).map(p => ({
+        number: p.number,
+        w: Math.round(p.width),
+        h: Math.round(p.height),
+        columns: p.columns ? p.columns.map(c => ({ x: Math.round(c.x), x1: c.x1 != null ? Math.round(c.x1) : null })) : null,
+        lineCount: p.lines ? p.lines.length : (p.lineCount || null),
+        lines: (p.lines || []).slice(0, 80).map(l => ({
+          x: Math.round(l.x != null ? l.x : (l.x0 || 0)),
+          y: Math.round(l.y != null ? l.y : (l.y0 || 0)),
+          size: l.size,
+          text: clip(l.text || (l.items ? l.items.map(i => i.str).join('') : ''))
+        }))
+      })),
+      blocks: blocks
+    };
+  }
+
+  /** 生成一个便于发送的纯文本摘要（前 200 行） */
+  function toText(report) {
+    const L = [];
+    L.push('灵译诊断报告  ' + report.generatedAt);
+    L.push('文件: ' + report.file.name + '   页数: ' + report.file.pages);
+    L.push('应用版本: ' + report.app.version);
+    L.push('');
+    L.push('块统计: ' + JSON.stringify(report.summary.byType));
+    L.push('正文字号: ' + report.summary.bodySize);
+    L.push('字号分布: ' + JSON.stringify(report.summary.sizeHistogram));
+    L.push('对齐分布: ' + JSON.stringify(report.summary.alignHistogram));
+    L.push('页面: ' + JSON.stringify(report.summary.pageSize));
+    L.push('');
+    L.push('=== 每页分栏 ===');
+    (report.pages || []).forEach(p => {
+      L.push('  page ' + p.number + '  ' + p.w + 'x' + p.h +
+        '  分栏: ' + (p.columns ? JSON.stringify(p.columns) : '无') +
+        '  行数: ' + (p.lineCount == null ? '?' : p.lineCount));
+    });
+    L.push('');
+    L.push('=== 每页前若干行的坐标与文字（看阅读顺序）===');
+    (report.pages || []).slice(0, 4).forEach(p => {
+      L.push('--- page ' + p.number + ' ---');
+      (p.lines || []).slice(0, 24).forEach(l => {
+        L.push('   x=' + l.x + ' y=' + l.y + ' sz=' + l.size + '  ' + JSON.stringify(l.text));
+      });
+    });
+    L.push('');
+    L.push('=== 块结构（前 60 个）===');
+    (report.blocks || []).slice(0, 60).forEach(b => {
+      if (b.type === 'container') {
+        L.push('[' + b.i + '] container ' + b.columns + ' 栏  x=' + JSON.stringify(b.columnX));
+        (b.blocks || []).slice(0, 16).forEach(cb => {
+          L.push('      col' + cb.col + ' [' + cb.type + ' sz=' + cb.size + ' ' + (cb.align || '') +
+            '] ' + JSON.stringify(cb.text || ('表格 ' + cb.rows + ' 行')));
+        });
+      } else if (b.type === 'table') {
+        L.push('[' + b.i + '] table ' + b.table.rows + '行 x ' + b.table.cols + '列  首行: ' + JSON.stringify(b.table.firstRow));
+      } else {
+        L.push('[' + b.i + '] ' + b.type + ' sz=' + b.size + ' ' + (b.align || '') +
+          (b.indent ? ' ind=' + b.indent : '') + '  ' + JSON.stringify(b.text || b.caption || ''));
+      }
+    });
+    return L.join('\n');
+  }
+
+  return { build, toText, describeBlock, countTypes, clip };
+});
+
+</script>
 <!-- ==================== tm.js ==================== -->
 <script>
 /* ============================================================================
@@ -3958,6 +4174,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
   const tr = window.LingyiTranslate;
   const gloss = window.LingyiGlossary;
   const tmMod = window.LingyiTM;
+  const diag = window.LingyiDiagnostics;
 
   /* ==================== 配置 ====================
    * 安全要点：这里只保存"云函数地址"，绝不保存任何密钥。
@@ -4382,6 +4599,49 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       refreshTMStats();
       showToast('翻译记忆已清空');
     });
+
+    /* ---- 诊断报告导出 ---- */
+    function collectDiag() {
+      const withIr = state.completed.concat(state.files).filter(x => x && x._ir);
+      const last = withIr.length ? withIr[withIr.length - 1] : null;
+      if (!last) {
+        const anyRun = state.completed.filter(x => x && x.name);
+        return { error: '还没有可诊断的解析结果。请先上传并翻译（或至少让它解析）一个文件。', hint: anyRun.length };
+      }
+      const report = diag.build(last._ir, {
+        version: VERSION,
+        fileName: last.name,
+        fileType: (last._meta && last._meta.fileType) || last.ext,
+        engine: last._meta && last._meta.engine,
+        target: last._meta && last._meta.target
+      });
+      return { report: report, name: last.name };
+    }
+    function downloadText(text, filename, mime) {
+      const blob = new Blob([text], { type: (mime || 'text/plain') + ';charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+    }
+    $('exportDiagBtn').addEventListener('click', () => {
+      const r = collectDiag();
+      if (r.error) { $('diagStatus').textContent = r.error; showToast(r.error, true); return; }
+      const json = JSON.stringify(r.report, null, 2);
+      downloadText(json, baseName(r.name) + '-诊断报告.json', 'application/json');
+      $('diagStatus').textContent = '已导出 JSON（' + Math.round(json.length / 1024) + ' KB）：块 ' +
+        r.report.summary.blockCount + ' 个，页 ' + r.report.file.pages + ' 页';
+      showToast('诊断报告已下载，请把它发给开发者');
+    });
+    $('exportDiagTextBtn').addEventListener('click', () => {
+      const r = collectDiag();
+      if (r.error) { $('diagStatus').textContent = r.error; showToast(r.error, true); return; }
+      const txt = diag.toText(r.report);
+      downloadText(txt, baseName(r.name) + '-诊断摘要.txt', 'text/plain');
+      $('diagStatus').textContent = '已导出可读摘要（' + Math.round(txt.length / 1024) + ' KB）';
+      showToast('可读摘要已下载');
+    });
   }
 
   /* ==================== 主流程 ==================== */
@@ -4389,6 +4649,10 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     f.status = 'running'; f.progress = 5; f.message = '准备中…'; setStage(f);
 
     const ir = await extractIR(f, (msg) => { f.message = msg; setStage(f); });
+    /* 保留解析结果：排版不满意时可一键导出诊断报告（含坐标与块结构），
+       用来区分"文字层本身有问题"还是"版式推断有问题"。 */
+    f._ir = ir;
+    f._meta = { engine: f.engine, target: f.targetLang, fileType: f.ext };
     const blockCount = (function count(bs) {
       let n = 0;
       for (const b of bs) {
