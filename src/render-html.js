@@ -231,16 +231,18 @@
   @media screen { .ly-toolbar{position:sticky;top:0;z-index:9;background:#1e293b;color:#fff;padding:8px 14px;font-family:system-ui,sans-serif;font-size:13px;display:flex;gap:12px;align-items:center;} .ly-toolbar button{background:#4f6ef7;border:0;color:#fff;padding:5px 12px;border-radius:14px;cursor:pointer;font-size:13px;} }
   @media print { .ly-toolbar{display:none !important;} }
 `;
+    const showToolbar = opts.toolbar !== false;
     return `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8">
 <title>${esc(title)}</title>
 <style>${css}</style></head>
 <body>
-<div class="ly-toolbar"><span>灵译 · 版式还原预览</span>
+${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</span>
   <button onclick="window.print()">打印 / 导出 PDF</button>
   <button onclick="document.body.classList.toggle('orig');document.querySelectorAll('.ly-p,.ly-h').forEach(function(e){var t=e.dataset.original;if(!t)return;var cur=e.innerHTML;e.innerHTML=t;e.dataset.original=cur;})">原文/译文切换</button>
-</div>
+</div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
+${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
 </body></html>`;
   }
 

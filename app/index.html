@@ -318,7 +318,7 @@
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     docx: 'Word（版式最完整）',
-    pdf: 'PDF（自动弹出打印，另存为 PDF）',
+    pdf: 'PDF（弹出打印，文件名已预填 .pdf）',
     'bilingual-stack': '原文译文对照（上下排列）',
     bilingual: '原文译文对照（左右分栏）',
     html: 'HTML 网页',
@@ -795,18 +795,21 @@
       blob = r.blob; outName = r.filename;
       html = rh.renderDocument(ir, opts);
     } else if (f.outFmt === 'pdf') {
-      html = rh.renderDocument(ir, Object.assign({ autoPrint: true }, opts));
+      /* 关于"为什么是 HTML"：浏览器里没有中文字体文件，自己写 PDF 只能显示 "?"，
+         所以 PDF 必须借助浏览器的打印引擎（它用系统字体渲染，中文才正确）。
+         这里把窗口标题设成目标文件名，打印对话框的默认文件名就是 xxx.pdf，
+         不会再出现 ".html.pdf" 这种双后缀。 */
+      html = rh.renderDocument(ir, Object.assign({ autoPrint: true, toolbar: false }, opts));
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      outName = outBase + '.html';
-      /* 自动弹出打印对话框 → 选「另存为 PDF」即可，不用再点一次 */
+      outName = outBase + '.pdf';                 // 打印对话框会用它作为默认文件名
       openHtmlInNewTab(html, outName, true);
-      showToast('已打开打印窗口：目标选择「另存为 PDF」即可保存', false);
+      showToast('已打开打印窗口：文件名已预填「' + outBase + '.pdf」，直接保存即可', false);
     } else if (f.outFmt === 'bilingual-stack') {
-      html = rh.renderStackedBilingual(ir, Object.assign({ autoPrint: true }, opts));
+      html = rh.renderStackedBilingual(ir, Object.assign({ autoPrint: true, toolbar: false }, opts));
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      outName = outBase + '-对照.html';
+      outName = outBase + '-对照.pdf';
       openHtmlInNewTab(html, outName, true);
-      showToast('已打开上下对照（原文在上、译文在下），可直接打印为 PDF', false);
+      showToast('已打开上下对照打印窗口（文件名已预填 .pdf），可直接保存为 PDF', false);
     } else if (f.outFmt === 'bilingual') {
       html = rh.renderBilingualDocument(ir, opts);
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });
