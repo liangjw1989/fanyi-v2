@@ -17,7 +17,7 @@
   'use strict';
   root.LINGYI_CONFIG = {
     /* 你自己的云函数 URL；留空则程序会提示使用者填写 */
-    API_URL: '',
+    API_URL: 'https://1430386389-cd8v5r6ng0.ap-beijing.tencentscf.com',
 
     /* 其它可选默认值（留空/注释掉即使用程序默认） */
     // DEFAULT_TARGET: 'zh-CN',     // 默认目标语言
