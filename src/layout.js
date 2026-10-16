@@ -197,6 +197,58 @@
    *   3) 通栏块按它在页面上的纵向位置插回正确位置
    * @returns {Array<{lines, box, spanning, depth}>} 按阅读顺序排列的区域
    */
+  /**
+   * 兜底分栏：按"行首 x"聚类，找出**与主栏互不重叠的窄边注栏**。
+   *
+   * 为什么需要它：期刊（MDPI 等）常见「宽正文栏 + 窄左边注栏」，
+   * 但走廊检测（findColumnCorridor）在这种情况下经常返回 null ——
+   * 因为右边注栏里的长行会横跨候选中缝。一旦拿不到走廊，
+   * analyzePage 就退回单栏，整页按 y 排序读取，
+   * 正文与边注**逐行交替**，表现为"句子被截断"。
+   *
+   * 判据（保守）：
+   *   · 至少 3 行落在某个"行首聚类"里（边注栏不会只有一两行）
+   *   · 该聚类的 x 区间与主栏的 x 区间**不重叠**（关键，避免把同栏内的
+   *     换行/缩进误判成另一栏）
+   *   · 主栏行数明显更多（≥ 边注行的 1.2 倍）
+   * @returns {Array|null} [边注行数组, 其余行数组]，顺序为"边注在前（若在左）"
+   */
+  function splitMarginalColumn(lines, opts) {
+    if (!lines || lines.length < 8) return null;
+    const minMinor = (opts && opts.minMinorLines) || 3;
+    /* 1) 按行首 x 聚类（20pt 容差） */
+    const clusters = [];
+    for (const l of lines) {
+      const found = clusters.find(c => Math.abs(c.x - l.x0) <= 20);
+      if (found) { found.lines.push(l); found.x = (found.x * (found.lines.length - 1) + l.x0) / found.lines.length; }
+      else clusters.push({ x: l.x0, lines: [l] });
+    }
+    if (clusters.length < 2) return null;
+    /* 2) 主栏 = 行数最多的聚类 */
+    clusters.sort((a, b) => b.lines.length - a.lines.length);
+    const body = clusters[0];
+    if (body.lines.length < minMinor * 1.2) return null;
+    /* 3) 主栏的 x 覆盖范围 */
+    const bodyX0 = Math.min.apply(null, body.lines.map(l => l.x0));
+    const bodyX1 = Math.max.apply(null, body.lines.map(l => l.x1));
+    /* 4) 找与主栏不重叠、且行数够的聚类 */
+    for (let i = 1; i < clusters.length; i++) {
+      const c = clusters[i];
+      if (c.lines.length < minMinor) continue;
+      if (c.lines.length >= body.lines.length) continue;
+      const cX0 = Math.min.apply(null, c.lines.map(l => l.x0));
+      const cX1 = Math.max.apply(null, c.lines.map(l => l.x1));
+      /* 必须完全不重叠（留 2pt 余量）*/
+      const overlaps = Math.min(bodyX1, cX1) - Math.max(bodyX0, cX0) > -2;
+      if (overlaps) continue;
+      const minor = c.lines.slice().sort((a, b) => a.y0 - b.y0);
+      const rest = lines.filter(l => c.lines.indexOf(l) < 0);
+      /* 边注在左 → 先输出边注；在右 → 先输出主栏 */
+      return cX1 <= bodyX0 ? [minor, rest] : [rest, minor];
+    }
+    return null;
+  }
+
   function analyzePage(items, opts) {
     opts = opts || {};
     if (!items.length) return [];
@@ -205,7 +257,15 @@
 
     // 在"片段级"找竖直走廊：分栏排版里，中缝上横跨的片段极少（通常只有通栏标题/公式）。
     const corridor = findColumnCorridor(items, opts);
-    if (!corridor) return [mkLineRegion(initialLines, 0)];
+    if (!corridor) {
+      /* 走廊检测失败时尝试"窄边注栏"兜底（MDPI 类版式常见）。
+         若成功，直接返回两块独立区域，避免正文与边注逐行交错。 */
+      const split = splitMarginalColumn(initialLines, opts);
+      if (split && split[0].length && split[1].length) {
+        return [mkLineRegion(split[0], 0, false), mkLineRegion(split[1], 0, false)];
+      }
+      return [mkLineRegion(initialLines, 0)];
+    }
 
     // 按走廊把片段分成 左 / 右 / 通栏
     const leftItems = [], rightItems = [], spanItems = [];
@@ -220,9 +280,44 @@
     }
     const leftLines = groupLines(leftItems);
     const rightLines = groupLines(rightItems);
-    if (leftLines.length < 3 || rightLines.length < 3) return [mkLineRegion(initialLines, 0)];
+    /* ------------------------------------------------------------------
+     * 走廊找到了，但两侧不对称（典型：MDPI 这类「宽正文栏 + 窄左边注栏」，
+     * 左边注只有版权声明/投稿日期/DOI 十几行）。
+     *
+     * 原来的做法是"退回单栏"——结果整页按 y 排序读取，
+     * 正文与边注逐行交替，读者看到的就是"句子被截断"。
+     *
+     * 正确做法：仍然按走廊切成两块独立文本（左边注块 + 右主栏块），
+     * 这样各自的阅读顺序都是正确的。只有连"两侧都有内容"都不成立时，
+     * 才真的退回单栏。
+     * ---------------------------------------------------------------- */
+    const leftOK = leftLines.length >= 3;
+    const rightOK = rightLines.length >= 3;
+    if (!leftOK && !rightOK) return [mkLineRegion(initialLines, 0)];
+    if (!leftOK || !rightOK) {
+      /* 一侧内容过少 → 只切两块，不要求平衡 */
+      const minorItems = leftOK ? leftItems : rightItems;
+      const majorItems = leftOK ? rightItems.concat(spanItems) : leftItems.concat(spanItems);
+      const minorLines = groupLines(minorItems);
+      const majorLines = groupLines(majorItems);
+      if (minorLines.length && majorLines.length) {
+        /* 边注栏在主栏左侧时先输出边注，否则先输出主栏 */
+        return leftOK
+          ? [mkLineRegion(minorLines, 0, false), mkLineRegion(majorLines, 0, false)]
+          : [mkLineRegion(majorLines, 0, false), mkLineRegion(minorLines, 0, false)];
+      }
+      return [mkLineRegion(initialLines, 0)];
+    }
     const ratio = Math.min(leftLines.length, rightLines.length) / Math.max(leftLines.length, rightLines.length);
-    if (ratio < 0.2) return [mkLineRegion(initialLines, 0)];
+    if (ratio < 0.2) {
+      /* 行数悬殊但两侧都有内容：同样按两块切，而不是让它们交错 */
+      const firstIsLeft = leftLines.length >= rightLines.length ? false : true;   // 主栏在前
+      const major = leftLines.length >= rightLines.length ? leftLines : rightLines;
+      const minor = leftLines.length >= rightLines.length ? rightLines : leftLines;
+      return firstIsLeft
+        ? [mkLineRegion(minor, 0, false), mkLineRegion(major, 0, false)]
+        : [mkLineRegion(major, 0, false), mkLineRegion(minor, 0, false)];
+    }
 
     // 通栏片段单独成行（按基线聚合）
     const spanLines = groupLines(spanItems);
@@ -447,7 +542,7 @@
 
   return {
     EPS, width, height, centerX, centerY, unionBox, overlap1d, crossingCount,
-    groupLines, lineMaxGap, lineGaps, findVerticalGutters, findColumnCorridor,
+    groupLines, lineMaxGap, lineGaps, findVerticalGutters, findColumnCorridor, splitMarginalColumn,
     analyzePage, analyzeLines, mkLineRegion, regionize, orderRegionsByFlow,
     detectTable
   };

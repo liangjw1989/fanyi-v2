@@ -15,6 +15,7 @@ const SUITES = [
   ['glossary.test.js', '术语库 · 符号保护 · 翻译记忆'],
   ['real-docx.test.js', '真实 Word 稿结构还原'],
   ['real-pdf.test.js', '真实 PDF 双栏版式还原'],
+  ['marginal-column.test.js', '窄边注栏切分（MDPI 类版式）'],
   ['header-footer.test.js', '页眉页脚与重复文字过滤'],
   ['diagnostics.test.js', '诊断报告（坐标/分栏/块结构）'],
   ['diagnostics-e2e.test.js', '诊断端到端（真实解析→报告可用）'],
