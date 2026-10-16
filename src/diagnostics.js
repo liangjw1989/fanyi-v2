@@ -51,7 +51,16 @@
       cols.forEach((g, ci) => {
         (g.blocks || []).filter(Boolean).slice(0, 40).forEach((cb, bi) => {
           if (cb.type === 'table') {
-            base.blocks.push({ col: ci, i: bi, type: 'table', rows: (cb.rows || []).length, cols: ((cb.rows || [])[0] || []).length });
+            /* 表格可能"碎裂"（一张表被切成很多 2 行小表），
+               所以必须记录行列规格与每行列数，才能判断。 */
+            const trows = cb.rows || [];
+            base.blocks.push({
+              col: ci, i: bi, type: 'table',
+              rows: trows.length,
+              cols: (trows[0] || []).length,
+              colCounts: trows.slice(0, 12).map(r => (r || []).length),
+              firstRow: (trows[0] || []).map(c => clip((c && c.text) || '')).slice(0, 6)
+            });
             return;
           }
           base.blocks.push({
@@ -61,6 +70,13 @@
           });
         });
       });
+      /* 容器内的表格汇总：一眼看出"是否被拆成很多小表" */
+      const innerTables = base.blocks.filter(x => x.type === 'table');
+      if (innerTables.length) {
+        base.tableCount = innerTables.length;
+        base.tableRows = innerTables.reduce((a, t) => a + (t.rows || 0), 0);
+        base.tableCols = innerTables.map(t => t.cols);
+      }
       return base;
     }
     base.size = b.size;

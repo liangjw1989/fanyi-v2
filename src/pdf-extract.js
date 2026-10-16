@@ -135,24 +135,110 @@
 
   /* ------------------------------------------------------------ 页眉页脚过滤 */
 
-  function filterMargins(items, pageH, pageW) {
-    if (items.length < 8) return { items: items, headerLine: null, footerLine: null };
+  /**
+   * 跨页重复文字检测：学术 PDF 的页眉/页脚（期刊名、卷期页码、DOI、
+   * "Downloaded from…"、Creative Commons 声明）会在多页重复出现。
+   * 这是比"位置 + 字号"更可靠的判据，能抓出位置/字号都像正文的页脚。
+   * @param {Array} pages [{ number, items }]
+   * @param {number} minPages 至少出现在几页才算"重复"（默认 3）
+   * @returns {Set<string>} 需要丢弃的规范化文本
+   */
+  function findRepeatedTexts(pages, minPages, o) {
+    const min = minPages || 3;
+    const band = (o && o.band != null) ? o.band : 0.15;
+    if (!pages || pages.length < min) return new Set();
+    const norm = t => String(t || '').replace(/\s+/g, ' ').replace(/\d+/g, '#').trim().toLowerCase();
+    const counter = new Map();
+    for (const pg of pages) {
+      const H = pg.height || 842;
+      const seen = new Set();                       // 同一页内只算一次
+      /* 先把每页的文字项按行粗分：这里只关心"整行文本" */
+      const byLine = new Map();
+      for (const it of (pg.items || [])) {
+        /* 【安全约束】只统计页面上/下"页边带"内的行。
+         * 否则"每页都相同的正文"（重复表头、模板化句子）会被误删。 */
+        if (!inBand(it, H, band)) continue;
+        const key = Math.round(it.y0 / 2);
+        if (!byLine.has(key)) byLine.set(key, []);
+        byLine.get(key).push(it);
+      }
+      for (const arr of byLine.values()) {
+        const lineText = arr.sort((a, b) => a.x0 - b.x0).map(i => i.str).join('');
+        const k = norm(lineText);
+        if (k.length < 6) continue;                 // 太短的不算（避免"1""2"误判）
+        if (seen.has(k)) continue;
+        seen.add(k);
+        counter.set(k, (counter.get(k) || 0) + 1);
+      }
+    }
+    const out = new Set();
+    for (const [k, n] of counter) if (n >= min) out.add(k);
+    return out;
+  }
+
+  /**
+   * 页边区域过滤 + 跨页重复文字过滤。
+   * 原实现只丢"上下 8.5% 且（字号偏小 或 纯数字）"，太保守：
+   * 期刊的页脚（卷期页码、DOI、版权声明）常常字号与正文接近，会漏进正文。
+   */
+  function filterMargins(items, pageH, pageW, opts) {
+    const o = opts || {};
+    /* 返回结构保持向后兼容：调用方按 .items 使用 */
+    if (items.length < 8) return { items: items, headerLine: null, footerLine: null, dropped: 0 };
     const sorted = items.slice().sort((a, b) => a.y0 - b.y0);
-    const topItems = sorted.filter(it => it.y0 < pageH * 0.085);
-    const bottomItems = sorted.filter(it => it.y0 > pageH * 0.915);
-    // 页眉页脚特征：字号小于正文、且位于上下 8.5% 区域内
-    const drop = new Set();
-    const headSizes = topItems.map(i => i.size);
-    const footSizes = bottomItems.map(i => i.size);
-    const bodySizes = sorted.map(i => i.size).sort((a, b) => a - b);
+    const topBand = o.topBand || 0.10;              // 上边 10%
+    const bottomBand = o.bottomBand || 0.10;        // 下边 10%
+    const topItems = sorted.filter(it => it.y0 < pageH * topBand);
+    const bottomItems = sorted.filter(it => it.y0 > pageH * (1 - bottomBand));
+    const bodySizes = sorted.map(it => it.size).sort((a, b) => a - b);
     const med = bodySizes[Math.floor(bodySizes.length / 2)] || 10;
-    for (const it of topItems) if (it.size <= med * 0.95 || /^\d{1,4}$/.test(it.str.trim())) drop.add(it);
-    for (const it of bottomItems) if (it.size <= med * 0.95 || /^\d{1,4}$/.test(it.str.trim())) drop.add(it);
+
+    const drop = new Set();
+    /* 上/下区域内：字号明显小、纯数字、或极短（页码/页眉标记）→ 丢弃 */
+    for (const it of topItems.concat(bottomItems)) {
+      const t = String(it.str || '').trim();
+      if (it.size <= med * 0.95) { drop.add(it); continue; }
+      if (/^\d{1,4}$/.test(t)) { drop.add(it); continue; }
+      if (t.length <= 2 && /^[\d\W]+$/.test(t)) { drop.add(it); continue; }
+    }
     return {
       items: items.filter(it => !drop.has(it)),
       dropped: drop.size,
       medianSize: med
     };
+  }
+
+  /** 文字对象是否落在页面上/下页边带内（y 轴向下） */
+  function inBand(it, pageH, band) {
+    const y = it.y0;
+    if (typeof y !== 'number') return false;
+    return y < pageH * band || y > pageH * (1 - band);
+  }
+
+  /** 按跨页重复文字丢弃（在 filterMargins 之后调用，作为第二道网） */
+  function dropRepeatedText(items, repeated, o) {
+    if (!repeated || !repeated.size) return { items: items, dropped: 0 };
+    const band = (o && o.band != null) ? o.band : 0.15;
+    const H = (o && o.pageHeight) || 842;
+    const norm = t => String(t || '').replace(/\s+/g, ' ').replace(/\d+/g, '#').trim().toLowerCase();
+    /* 按行分组后整行匹配：整行的规范化文本命中"重复集合"才丢，
+       且只丢页边带内的行（安全约束，见 findRepeatedTexts 注释） */
+    const byLine = new Map();
+    for (const it of items) {
+      const key = Math.round(it.y0 / 2);
+      if (!byLine.has(key)) byLine.set(key, []);
+      byLine.get(key).push(it);
+    }
+    const drop = new Set();
+    for (const arr of byLine.values()) {
+      arr.sort((a, b) => a.x0 - b.x0);
+      /* 只处理页边带内的行 */
+      if (!inBand(arr[0], H, band)) continue;
+      const lineText = arr.map(i => i.str).join('');
+      const k = norm(lineText);
+      if (k.length >= 6 && repeated.has(k)) for (const it of arr) drop.add(it);
+    }
+    return { items: items.filter(it => !drop.has(it)), dropped: drop.size };
   }
 
   /* -------------------------------------------------------------- 行 → 段落 */
@@ -326,15 +412,34 @@
       let items = textContent.items
         .filter(it => it && it.str !== undefined && String(it.str).length)
         .map(it => makeItem(it, textContent.styles));
-      const filtered = filterMargins(items, viewport.height, viewport.width);
+      const filtered = filterMargins(items, viewport.height, viewport.width, {
+        topBand: opts.topBand, bottomBand: opts.bottomBand
+      });
       // 双重文字层去重是"有风险但有用"的启发式，默认关闭，可在调用时打开
       const deduped = opts.dedupeTextLayers ? dedupeTextLayers(filtered.items) : filtered.items;
       pages.push({
         number: p, width: viewport.width, height: viewport.height,
         items: normalizePageCoords(deduped, viewport.width, viewport.height),
-        medianSize: filtered.medianSize
+        medianSize: filtered.medianSize,
+        droppedByMargin: filtered.dropped || 0
       });
       if (opts.onProgress) opts.onProgress(p, maxPages);
+    }
+
+    /* ---- 第二道网：跨页重复文字（页眉/页脚/版权声明）----
+     * 位置与字号都像正文的页脚（期刊名、卷期页码、DOI、CC 声明）靠
+     * filterMargins 抓不到，但它们必然在多页重复出现，所以按"重复"丢弃。
+     * 默认开启（opts.dropRepeatedLines !== false），可用 minRepeatPages 调整。 */
+    let droppedRepeated = 0;
+    if (opts.dropRepeatedLines !== false && pages.length >= 3) {
+      const repeated = findRepeatedTexts(pages, opts.minRepeatPages || 3, { band: opts.repeatBand });
+      if (repeated.size) {
+        for (const pg of pages) {
+          const r = dropRepeatedText(pg.items, repeated, { pageHeight: pg.height, band: opts.repeatBand });
+          pg.items = r.items;
+          droppedRepeated += r.dropped;
+        }
+      }
     }
 
     // 正文字号 = 全篇字符数加权的中位数
@@ -355,9 +460,42 @@
 
     const assets = [];
     const blocks = [];
+    /* 每页的"版式诊断信息"：行聚类结果与分栏推断。
+     * 这是定位"阅读顺序错乱/句子被截断"问题的关键证据，
+     * 之前没有保留，导致诊断报告里 pages 为空、无法定位问题。 */
+    const pageMeta = [];
     pages.forEach(function (pg, pageIdx) {
-      if (!pg.items.length) return;
+      if (!pg.items.length) {
+        pageMeta.push({ number: pg.number, width: pg.width, height: pg.height, columns: [], lines: [], lineCount: 0 });
+        return;
+      }
       const regions = layout.analyzePage(pg.items, {});
+      /* 汇总本页所有区域的行与分栏，供诊断使用 */
+      const allLines = [];
+      (regions || []).forEach(r => {
+        (r.lines || []).forEach(ln => {
+          allLines.push({
+            x: Math.round((ln.x != null ? ln.x : (ln.leftEdge || 0)) * 10) / 10,
+            y: Math.round((ln.y != null ? ln.y : 0) * 10) / 10,
+            size: ln.size,
+            text: String(ln.text || (ln.items ? ln.items.map(i => i.str).join('') : '')).slice(0, 400),
+            region: { x0: Math.round(r.box.x0), x1: Math.round(r.box.x1), spanning: !!r.spanning }
+          });
+        });
+      });
+      pageMeta.push({
+        number: pg.number,
+        width: pg.width,
+        height: pg.height,
+        columns: (regions || []).map(r => ({
+          x: Math.round(r.box.x0),
+          x1: Math.round(r.box.x1),
+          spanning: !!r.spanning,
+          lineCount: (r.lines || []).length
+        })),
+        lines: allLines,
+        lineCount: allLines.length
+      });
       // 同一"栏带"内的区域（左栏/右栏）合并成一个分栏容器，输出时才能保住双栏版式
       let pendingBand = null;
       const flushBand = () => {
@@ -409,6 +547,7 @@
       assets: assets
     });
     ir.blocks = blocks;
+    ir.pages = pageMeta;                 // 版式诊断用：每页的行与分栏
     while (ir.blocks.length && ir.blocks[ir.blocks.length - 1].type === 'pagebreak') ir.blocks.pop();
     ir.bodySize = bodySize;
     ir.fontSizes = [...new Set(pages.flatMap(p => p.items.map(i => Math.round(i.size * 2) / 2)))].sort((a, b) => b - a);
@@ -573,7 +712,7 @@
   }
 
   return {
-    extractPDF, makeItem, filterMargins, linesToParagraphs, segmentTableAndText,
+    extractPDF, makeItem, filterMargins, findRepeatedTexts, dropRepeatedText, linesToParagraphs, segmentTableAndText,
     tableToIR, paragraphToIR, inferStyle, fontsCompat, normalizePageCoords,
     estimateMargins, dedupeTextLayers
   };

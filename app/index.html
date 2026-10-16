@@ -210,7 +210,7 @@
         <button class="btn btn-outline btn-sm" id="exportDiagTextBtn">⬇ 导出可读摘要（TXT）</button>
       </div>
       <div id="diagStatus" style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.6rem;">
-        提示：需要先翻译（或至少解析）过一个文件。
+        提示：上传文件、等它解析完成（出现"解析完成"）即可导出，不必等翻译完。注意刷新页面会清空。
       </div>
 
       <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
@@ -754,20 +754,21 @@
 
     /* ---- 诊断报告导出 ---- */
     function collectDiag() {
-      const withIr = state.completed.concat(state.files).filter(x => x && x._ir);
-      const last = withIr.length ? withIr[withIr.length - 1] : null;
-      if (!last) {
-        const anyRun = state.completed.filter(x => x && x.name);
-        return { error: '还没有可诊断的解析结果。请先上传并翻译（或至少让它解析）一个文件。', hint: anyRun.length };
+      /* 优先取已完成记录里的诊断快照；再退回当前待翻译列表 */
+      const done = state.completed.filter(x => x && x.diag);
+      if (done.length) {
+        const last = done[done.length - 1];
+        return { report: last.diag, name: last.outName || last.name };
       }
-      const report = diag.build(last._ir, {
-        version: VERSION,
-        fileName: last.name,
-        fileType: (last._meta && last._meta.fileType) || last.ext,
-        engine: last._meta && last._meta.engine,
-        target: last._meta && last._meta.target
-      });
-      return { report: report, name: last.name };
+      const pending = state.files.filter(x => x && x._diag);
+      if (pending.length) {
+        const last = pending[pending.length - 1];
+        return { report: last._diag, name: last.name };
+      }
+      return {
+        error: '还没有可诊断的解析结果。请先上传并解析一个文件（不必等翻译完），' +
+          '然后回到这里点导出。注意：刷新页面会清空，请在同一次会话内导出。'
+      };
     }
     function downloadText(text, filename, mime) {
       const blob = new Blob([text], { type: (mime || 'text/plain') + ';charset=utf-8' });
@@ -801,9 +802,17 @@
     f.status = 'running'; f.progress = 5; f.message = '准备中…'; setStage(f);
 
     const ir = await extractIR(f, (msg) => { f.message = msg; setStage(f); });
-    /* 保留解析结果：排版不满意时可一键导出诊断报告（含坐标与块结构），
-       用来区分"文字层本身有问题"还是"版式推断有问题"。 */
-    f._ir = ir;
+    /* 解析完成就立刻生成"诊断报告快照"：
+       排版不满意时不用重新翻译，直接导出即可（诊断只需要解析结果）。
+       报告体量不大（每块截断 220 字），可以安全地随完成记录保留。 */
+    try {
+      f._diag = window.LingyiDiagnostics
+        ? diag.build(ir, {
+          version: VERSION, fileName: f.name, fileType: f.ext,
+          engine: f.engine, target: f.targetLang
+        })
+        : null;
+    } catch (e) { f._diag = null; }
     f._meta = { engine: f.engine, target: f.targetLang, fileType: f.ext };
     const blockCount = (function count(bs) {
       let n = 0;
@@ -894,8 +903,12 @@
 
     f.status = 'done'; f.progress = 100; f.message = '完成';
     state.files = state.files.filter(x => x.id !== f.id);
+    /* 注意：这里必须把解析阶段生成的诊断报告一起带过来。
+       之前只复制了 id/name/outName/blob，导致"导出诊断报告"永远提示
+       "还没有可诊断的解析结果"。 */
     state.completed.push({
       id: f.id, name: f.name, outName: outName, blob: blob, html: html,
+      diag: f._diag || null,
       summary: `成功 ${result.translated} 段 / 保留 ${result.fallback} 段`
     });
     addRecord(f, outName);
