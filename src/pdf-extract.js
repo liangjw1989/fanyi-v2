@@ -470,13 +470,18 @@
         return;
       }
       const regions = layout.analyzePage(pg.items, {});
-      /* 汇总本页所有区域的行与分栏，供诊断使用 */
+      /* 汇总本页所有区域的行与分栏，供诊断使用。
+       * 注意：layout 的行对象字段是 x0/y0/x1/y1（不是 x/y/leftEdge），
+       * 之前取错字段导致诊断报告里所有坐标都是 0。 */
       const allLines = [];
       (regions || []).forEach(r => {
         (r.lines || []).forEach(ln => {
+          const x0 = (ln.x0 != null) ? ln.x0 : (ln.leftEdge != null ? ln.leftEdge : null);
+          const x1 = (ln.x1 != null) ? ln.x1 : (x0 != null ? x0 : null);
           allLines.push({
-            x: Math.round((ln.x != null ? ln.x : (ln.leftEdge || 0)) * 10) / 10,
-            y: Math.round((ln.y != null ? ln.y : 0) * 10) / 10,
+            x: x0 == null ? null : Math.round(x0 * 10) / 10,
+            x1: x1 == null ? null : Math.round(x1 * 10) / 10,
+            y: Math.round(((ln.y0 != null ? ln.y0 : (ln.y || 0))) * 10) / 10,
             size: ln.size,
             text: String(ln.text || (ln.items ? ln.items.map(i => i.str).join('') : '')).slice(0, 400),
             region: { x0: Math.round(r.box.x0), x1: Math.round(r.box.x1), spanning: !!r.spanning }
@@ -494,7 +499,29 @@
           lineCount: (r.lines || []).length
         })),
         lines: allLines,
-        lineCount: allLines.length
+        lineCount: allLines.length,
+        /* 原始文字项的坐标直方图：用来判断"中缝在哪、为什么两栏没切开"。
+         * 只记 x 起点的分布与样例，体积可控。 */
+        itemCount: pg.items.length,
+        xHistogram: (function () {
+          const h = {};
+          for (const it of pg.items) h[Math.floor(it.x0 / 20) * 20] = (h[Math.floor(it.x0 / 20) * 20] || 0) + 1;
+          return h;
+        })(),
+        itemSamples: (function () {
+          /* 每隔若干项取一个样本（带 x0/x1/y0/size），最多 60 条 */
+          const step = Math.max(1, Math.floor(pg.items.length / 60));
+          const out = [];
+          for (let i = 0; i < pg.items.length && out.length < 60; i += step) {
+            const it = pg.items[i];
+            out.push({
+              x: Math.round(it.x0 * 10) / 10, x1: Math.round(it.x1 * 10) / 10,
+              y: Math.round(it.y0 * 10) / 10, size: Math.round((it.size || 0) * 10) / 10,
+              s: String(it.str || '').slice(0, 40)
+            });
+          }
+          return out;
+        })()
       });
       // 同一"栏带"内的区域（左栏/右栏）合并成一个分栏容器，输出时才能保住双栏版式
       let pendingBand = null;

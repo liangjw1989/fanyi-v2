@@ -2291,13 +2291,18 @@
         return;
       }
       const regions = layout.analyzePage(pg.items, {});
-      /* 汇总本页所有区域的行与分栏，供诊断使用 */
+      /* 汇总本页所有区域的行与分栏，供诊断使用。
+       * 注意：layout 的行对象字段是 x0/y0/x1/y1（不是 x/y/leftEdge），
+       * 之前取错字段导致诊断报告里所有坐标都是 0。 */
       const allLines = [];
       (regions || []).forEach(r => {
         (r.lines || []).forEach(ln => {
+          const x0 = (ln.x0 != null) ? ln.x0 : (ln.leftEdge != null ? ln.leftEdge : null);
+          const x1 = (ln.x1 != null) ? ln.x1 : (x0 != null ? x0 : null);
           allLines.push({
-            x: Math.round((ln.x != null ? ln.x : (ln.leftEdge || 0)) * 10) / 10,
-            y: Math.round((ln.y != null ? ln.y : 0) * 10) / 10,
+            x: x0 == null ? null : Math.round(x0 * 10) / 10,
+            x1: x1 == null ? null : Math.round(x1 * 10) / 10,
+            y: Math.round(((ln.y0 != null ? ln.y0 : (ln.y || 0))) * 10) / 10,
             size: ln.size,
             text: String(ln.text || (ln.items ? ln.items.map(i => i.str).join('') : '')).slice(0, 400),
             region: { x0: Math.round(r.box.x0), x1: Math.round(r.box.x1), spanning: !!r.spanning }
@@ -2315,7 +2320,29 @@
           lineCount: (r.lines || []).length
         })),
         lines: allLines,
-        lineCount: allLines.length
+        lineCount: allLines.length,
+        /* 原始文字项的坐标直方图：用来判断"中缝在哪、为什么两栏没切开"。
+         * 只记 x 起点的分布与样例，体积可控。 */
+        itemCount: pg.items.length,
+        xHistogram: (function () {
+          const h = {};
+          for (const it of pg.items) h[Math.floor(it.x0 / 20) * 20] = (h[Math.floor(it.x0 / 20) * 20] || 0) + 1;
+          return h;
+        })(),
+        itemSamples: (function () {
+          /* 每隔若干项取一个样本（带 x0/x1/y0/size），最多 60 条 */
+          const step = Math.max(1, Math.floor(pg.items.length / 60));
+          const out = [];
+          for (let i = 0; i < pg.items.length && out.length < 60; i += step) {
+            const it = pg.items[i];
+            out.push({
+              x: Math.round(it.x0 * 10) / 10, x1: Math.round(it.x1 * 10) / 10,
+              y: Math.round(it.y0 * 10) / 10, size: Math.round((it.size || 0) * 10) / 10,
+              s: String(it.str || '').slice(0, 40)
+            });
+          }
+          return out;
+        })()
       });
       // 同一"栏带"内的区域（左栏/右栏）合并成一个分栏容器，输出时才能保住双栏版式
       let pendingBand = null;
@@ -2787,7 +2814,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.3.0 | sha256:9310c16576001d57 | 2026-10-16 -->
+<!-- build: v2.3.0 | sha256:81e2e216f33d80b8 | 2026-10-16 -->
 </body></html>`;
   }
 
@@ -4875,19 +4902,22 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     } else if (f.outFmt === 'pdf') {
       /* 关于"为什么是 HTML"：浏览器里没有中文字体文件，自己写 PDF 只能显示 "?"，
          所以 PDF 必须借助浏览器的打印引擎（它用系统字体渲染，中文才正确）。
-         这里把窗口标题设成目标文件名，打印对话框的默认文件名就是 xxx.pdf，
-         不会再出现 ".html.pdf" 这种双后缀。 */
+         文件名关键点：窗口标题【不要带扩展名】。
+         带 ".pdf" 会让浏览器把 HTML 内容存成 xxx.pdf（内容与扩展名不符，
+         Windows/WPS 会报"检测到扩展名已更改、文件可能损坏"）；
+         带 ".html" 又会存成 xxx.html.pdf。
+         只写主名，打印对话框默认就是"主名.pdf"，内容与扩展名一致。 */
       html = rh.renderDocument(ir, Object.assign({ autoPrint: true, toolbar: false }, opts));
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      outName = outBase + '.pdf';                 // 打印对话框会用它作为默认文件名
+      outName = outBase;                          // 不带扩展名
       openHtmlInNewTab(html, outName, true);
-      showToast('已打开打印窗口：文件名已预填「' + outBase + '.pdf」，直接保存即可', false);
+      showToast('已打开打印窗口（文件名已预填「' + outBase + '」），保存为 PDF 即可', false);
     } else if (f.outFmt === 'bilingual-stack') {
       html = rh.renderStackedBilingual(ir, Object.assign({ autoPrint: true, toolbar: false }, opts));
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      outName = outBase + '-对照.pdf';
+      outName = outBase + '-对照';
       openHtmlInNewTab(html, outName, true);
-      showToast('已打开上下对照打印窗口（文件名已预填 .pdf），可直接保存为 PDF', false);
+      showToast('已打开上下对照打印窗口（文件名已预填），保存为 PDF 即可', false);
     } else if (f.outFmt === 'bilingual') {
       html = rh.renderBilingualDocument(ir, opts);
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });

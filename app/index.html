@@ -872,19 +872,22 @@
     } else if (f.outFmt === 'pdf') {
       /* 关于"为什么是 HTML"：浏览器里没有中文字体文件，自己写 PDF 只能显示 "?"，
          所以 PDF 必须借助浏览器的打印引擎（它用系统字体渲染，中文才正确）。
-         这里把窗口标题设成目标文件名，打印对话框的默认文件名就是 xxx.pdf，
-         不会再出现 ".html.pdf" 这种双后缀。 */
+         文件名关键点：窗口标题【不要带扩展名】。
+         带 ".pdf" 会让浏览器把 HTML 内容存成 xxx.pdf（内容与扩展名不符，
+         Windows/WPS 会报"检测到扩展名已更改、文件可能损坏"）；
+         带 ".html" 又会存成 xxx.html.pdf。
+         只写主名，打印对话框默认就是"主名.pdf"，内容与扩展名一致。 */
       html = rh.renderDocument(ir, Object.assign({ autoPrint: true, toolbar: false }, opts));
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      outName = outBase + '.pdf';                 // 打印对话框会用它作为默认文件名
+      outName = outBase;                          // 不带扩展名
       openHtmlInNewTab(html, outName, true);
-      showToast('已打开打印窗口：文件名已预填「' + outBase + '.pdf」，直接保存即可', false);
+      showToast('已打开打印窗口（文件名已预填「' + outBase + '」），保存为 PDF 即可', false);
     } else if (f.outFmt === 'bilingual-stack') {
       html = rh.renderStackedBilingual(ir, Object.assign({ autoPrint: true, toolbar: false }, opts));
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      outName = outBase + '-对照.pdf';
+      outName = outBase + '-对照';
       openHtmlInNewTab(html, outName, true);
-      showToast('已打开上下对照打印窗口（文件名已预填 .pdf），可直接保存为 PDF', false);
+      showToast('已打开上下对照打印窗口（文件名已预填），保存为 PDF 即可', false);
     } else if (f.outFmt === 'bilingual') {
       html = rh.renderBilingualDocument(ir, opts);
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });
