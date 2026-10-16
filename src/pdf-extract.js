@@ -214,11 +214,58 @@
 
   /* -------------------------------------------------- 行块 → 表格（表格优先） */
 
+  /** 表格标题行（"表 1 …" / "Table 1 …"）：合并碎片时遇到它就停下 */
+  function isTableCaption(line) {
+    const t = String((line && line.text) || '').trim();
+    return /^(表|图|圖|Table|TABLE|Tab\.)\s*\d/.test(t);
+  }
+
   /**
-   * 在区域内找出连续的表格行，切开成表格块 / 段落块
+   * 能否把当前表格碎片并进上一个表格碎片。
+   * 背景：PDF 里表格没有结构，只能靠坐标推断；原实现遇到"列数变化"就断开，
+   * 于是一张 6 行的表会被切成 3 个"2 行"碎片（实测一篇论文 20 个表格里
+   * 19 个都是 2 行碎片 + 1 个 39 行巨表）。这里做保守合并：
+   *   · 两块必须紧挨着（中间没有正文行、没有表格标题行）
+   *   · 列数相差不超过 2（4 列表格不会和正文段拼在一起）
+   *   · 合并后总行数不超过上限
+   * 目标：把"一张表被切碎"还原回来，又不把"两张真表"误粘。
+   */
+  function canMergeTable(prev, cur, lines) {
+    if (!prev || !cur || !prev.table || !cur.table) return false;
+    const pc = prev.table.colCount || 0, cc = cur.table.colCount || 0;
+    if (!pc || !cc) return false;
+    if (Math.abs(pc - cc) > 2) return false;
+    const between = lines.slice(prev.endIndex, cur.startIndex);
+    for (const ln of between) {
+      if (!ln) continue;
+      if (isTableCaption(ln)) return false;
+      const txt = String(ln.text || '').trim();
+      // 非空、又不像"零星数字/符号" → 视为正文，不合并
+      if (txt && txt.length > 3 && !/^[\d\s.,%\-–—()]+$/.test(txt)) return false;
+    }
+    const prevRows = (prev.table.rows || []).length;
+    const curRows = (cur.table.rows || []).length;
+    if (prevRows + curRows > 120) return false;
+    return true;
+  }
+
+  /** 拼接两个表格碎片（列数不同时按较宽的一侧保留） */
+  function mergeTables(a, b) {
+    return {
+      rows: (a.rows || []).concat(b.rows || []),
+      colCount: Math.max(a.colCount || 0, b.colCount || 0),
+      quality: Math.min(a.quality == null ? 1 : a.quality, b.quality == null ? 1 : b.quality),
+      merged: true
+    };
+  }
+
+  /**
+   * 在区域内找出连续的表格行，切开成表格块 / 段落块。
+   * 相邻的表格碎片会按 canMergeTable 的规则合并回一张表。
    */
   function segmentTableAndText(lines) {
     const out = [];
+    let lastTable = null;      // 最近一个表格段（可能被 text 段隔开，仍可尝试合并）
     let i = 0;
     while (i < lines.length) {
       let found = null;
@@ -229,7 +276,22 @@
         if (t && t.quality >= 0.8 && t.colCount >= 2) { found = { t: t, lines: cand }; break; }
       }
       if (found) {
-        out.push({ kind: 'table', table: found.t, lines: found.lines });
+        const seg = {
+          kind: 'table', table: found.t, lines: found.lines,
+          startIndex: i, endIndex: i + found.lines.length
+        };
+        /* 尝试并入"上一个表格段"（中间可能夹着被单独判成 text 的
+         * 数字行 / 空白行——它们不应当阻止合并，由 canMergeTable 判定）。 */
+        const prev = lastTable;
+        if (prev && prev.endIndex <= seg.startIndex && canMergeTable(prev, seg, lines)) {
+          prev.table = mergeTables(prev.table, seg.table);
+          prev.lines = prev.lines.concat(seg.lines);
+          prev.endIndex = seg.endIndex;
+          prev.mergedCount = (prev.mergedCount || 1) + 1;
+        } else {
+          out.push(seg);
+          lastTable = seg;
+        }
         i += found.lines.length;
         continue;
       }

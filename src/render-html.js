@@ -281,6 +281,102 @@
     return (t.rows || []).map(row => row.map(c => (key === 'o' ? (c.o || '') : (c.text || ''))).join(' | ')).join('\n');
   }
 
+  /**
+   * 上下对照（仿搜狗翻译的模式）：原文一段、译文紧接着跟在下面。
+   * 与左右分栏的 renderBilingualDocument 互补 —— 上下式在手机上阅读更舒服，
+   * 长段落也不会被挤成窄窄一条。
+   */
+  function renderStackedBilingual(ir, opts) {
+    opts = opts || {};
+    const bodySize = opts.bodySize || ir.bodySize || 10.5;
+    const parts = [];
+
+    /** 一个单元格：原文在上，译文在下（译文用醒目底色区分） */
+    const pair = (orig, trans, tag, extraClass) => {
+      const o = String(orig == null ? '' : orig).trim();
+      const t = String(trans == null ? '' : trans).trim();
+      if (!o && !t) return '';
+      const cls = 'pair' + (extraClass ? ' ' + extraClass : '');
+      const tagO = tag || 'div';
+      const tagT = tag === 'h1' || tag === 'h2' || tag === 'h3' ? 'div' : (tag || 'div');
+      return `<div class="${cls}">` +
+        (o ? `<${tagO} class="src">${esc(o)}</${tagO}>` : '') +
+        (t ? `<${tagT} class="dst">${esc(t)}</${tagT}>` : '') +
+        `</div>`;
+    };
+
+    const walk = (blocks, depth) => {
+      for (const b of blocks || []) {
+        if (b.type === 'container') { (b.columns || []).forEach(g => walk(g.blocks || [], depth)); continue; }
+        if (b.type === 'pagebreak') { parts.push('<div class="pb"></div>'); continue; }
+        if (b.type === 'hr') { parts.push('<hr>'); continue; }
+        if (b.type === 'image') {
+          if (b.src || b.dataUrl) {
+            parts.push(`<div class="imgwrap"><img src="${esc(b.src || b.dataUrl)}" alt="${esc(b.alt || '')}"></div>`);
+          }
+          if (b.caption) parts.push(pair(b.captionO || b.caption, b.caption, 'div', 'caption'));
+          continue;
+        }
+        if (b.type === 'table') {
+          /* 表格：逐单元格上下对照，保持原行列结构 */
+          const rows = (b.rows || []).map(row => '<tr>' + row.map(c => {
+            const o = String(c.o == null ? '' : c.o).trim();
+            const t = String(c.text == null ? '' : c.text).trim();
+            const inner = (o && t && o !== t)
+              ? `<div class="csrc">${esc(o)}</div><div class="cdst">${esc(t)}</div>`
+              : esc(t || o);
+            const span = (c.colspan && c.colspan > 1) ? ` colspan="${c.colspan}"` : '';
+            return `<td${span}>${inner}</td>`;
+          }).join('') + '</tr>').join('');
+          parts.push(`<table class="tbl">${rows}</table>`);
+          continue;
+        }
+        const o = b.o || '';
+        const t = core.runsToText(b.runs || []);
+        if (b.type === 'heading') {
+          const lv = Math.min(3, Math.max(1, b.level || 1));
+          parts.push(pair(o, t, 'h' + lv, 'heading'));
+        } else {
+          parts.push(pair(o, t, 'div'));
+        }
+      }
+    };
+    walk(ir.blocks || [], 0);
+
+    const title = opts.title || ('原文译文对照 · ' + (ir.meta.fileName || ''));
+    const showToolbar = opts.toolbar !== false;
+    return `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+<style>
+ body{margin:0;background:#eef1f6;font-family:'Source Han Serif SC',SimSun,serif;font-size:${bodySize}pt;line-height:1.55;color:#0f172a;}
+ .wrap{max-width:820px;margin:0 auto;background:#fff;padding:28pt 32pt 60pt;box-shadow:0 2px 12px rgba(0,0,0,.1);}
+ h1.doc{font-size:15pt;text-align:center;margin:0 0 20pt;font-weight:700;}
+ .pair{margin:0 0 10pt;}
+ .pair .src{color:#0f172a;margin:0 0 2pt;}
+ .pair .dst{color:#0b5fa5;margin:0;padding-left:0;}
+ .pair.heading{margin-top:16pt;}
+ .pair.heading .src{font-weight:700;}
+ .pair.heading .dst{font-weight:700;color:#0a4d85;}
+ .pair.caption{font-size:90%;color:#475569;margin-top:4pt;}
+ .pair.caption .dst{color:#0b5fa5;}
+ table.tbl{border-collapse:collapse;width:100%;margin:8pt 0 12pt;}
+ table.tbl td{border:1px solid #94a3b8;padding:3pt 5pt;vertical-align:top;font-size:92%;}
+ .csrc{color:#475569;}
+ .cdst{color:#0b5fa5;}
+ .imgwrap{text-align:center;margin:10pt 0;}
+ .imgwrap img{max-width:100%;}
+ hr{border:0;border-top:1px solid #cbd5e1;margin:14pt 0;}
+ .pb{page-break-after:always;break-after:page;}
+ .ly-toolbar{position:fixed;top:12px;right:12px;z-index:9;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+ .ly-toolbar button{font-size:12px;padding:5px 10px;cursor:pointer;border:1px solid #cbd5e1;background:#f8fafc;border-radius:6px;}
+ @media print{ body{background:#fff;} .wrap{box-shadow:none;max-width:none;padding:0;} .ly-toolbar{display:none !important;} }
+</style></head><body>
+${showToolbar ? '<div class="ly-toolbar"><button onclick="window.print()">打印 / 导出 PDF</button></div>' : ''}
+<div class="wrap"><h1 class="doc">${esc(title)}</h1>${parts.join('\n')}</div>
+${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},350);});<\/script>' : ''}
+</body></html>`;
+  }
+
   /** 纯文本导出（保留段落换行与表格制表符） */
   function renderText(ir, opts) {
     opts = opts || {};
@@ -306,5 +402,5 @@
     return lines.join('\n').replace(/\n{3,}/g, '\n\n');
   }
 
-  return { renderPages, renderDocument, renderBilingualDocument, renderText, renderBlock, runsToHtml, computeColWidths, tableToHtml };
+  return { renderPages, renderDocument, renderBilingualDocument, renderStackedBilingual, renderText, renderBlock, runsToHtml, computeColWidths, tableToHtml };
 });

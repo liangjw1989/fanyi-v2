@@ -15,6 +15,9 @@ const SUITES = [
   ['glossary.test.js', '术语库 · 符号保护 · 翻译记忆'],
   ['real-docx.test.js', '真实 Word 稿结构还原'],
   ['real-pdf.test.js', '真实 PDF 双栏版式还原'],
+  ['merge-table.test.js', '表格碎片合并（PDF 表格还原）'],
+  ['docx-columns.test.js', 'Word 分栏节生成'],
+  ['docx-real.test.js', '真实 docx 库验证（分栏/字号/缩进/表格 XML）'],
   ['e2e.test.js', '端到端：解析 → 翻译 → 生成 Word/HTML']
 ];
 
@@ -46,7 +49,10 @@ for (const [file, label] of SUITES) {
   if (!fs.existsSync(p)) { rows.push([label, '-', '跳过']); continue; }
   const r = run(p);
   const m = /通过 (\d+) 项，失败 (\d+) 项/.exec(r.out);
-  const skipped = /跳过/.test(r.out) && !/✗/.test(r.out);
+  /* "跳过"只在测试自己明确声明"缺少真实样本"时才算数。
+   * 注意不能只匹配"跳过"二字：有些测试会打印"（跳过：本机未安装 xx）"
+   * 之类的说明，那是信息而非跳过整套测试。 */
+  const skipped = /缺少真实样本.{0,12}跳过|跳过.{0,12}缺少真实样本/.test(r.out) && !/✗/.test(r.out);
   let pass = m ? +m[1] : 0;
   let fail = m ? +m[2] : (skipped ? 0 : 1);
   if (!m && !skipped) {

@@ -137,25 +137,41 @@
     }
 
     const children = [];
+    const pendingSections = [];         // 分栏节（container → Word 的 w:cols 节）
+    const collectorStack = [children];  // 当前输出收集器（栈顶）
+    const cur = () => collectorStack[collectorStack.length - 1];
     const emit = (b, inCell) => {
       if (b.type === 'hr') {
-        children.push(new Paragraph({
+        cur().push(new Paragraph({
           children: [new TextRun({ text: '' })],
           border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '999999' } }
         }));
         return;
       }
       if (b.type === 'pagebreak') {
-        children.push(new Paragraph({ children: [new PageBreak()] }));
+        cur().push(new Paragraph({ children: [new PageBreak()] }));
         return;
       }
       if (b.type === 'container') {
-        // Word 的分栏由节属性控制，这里按栏依次输出内容（版式仍完整保留，只是不分栏）
+        /* 分栏还原：Word 的栏数由「节属性」控制，不能像段落那样直接输出。
+         * 做法：把容器里各栏内容按顺序放进【独立的一节】，并给这一节设置
+         * column.count = 栏数。这样 Word 打开后就是真正的双栏排版，
+         * 而不是被拍平成单栏（原做法会让"排版不像原文"）。
+         * 用收集器栈来保证嵌套结构（表格/图片）也进到正确的节里。 */
+        const cols = (b.columns || []).filter(g => g && (g.blocks || []).length);
+        if (cols.length >= 2) {
+          const inner = [];
+          collectorStack.push(inner);
+          cols.forEach(g => (g.blocks || []).forEach(cb => emit(cb)));
+          collectorStack.pop();
+          if (inner.length) pendingSections.push({ children: inner, count: cols.length });
+          return;
+        }
         (b.columns || []).forEach(g => (g.blocks || []).forEach(cb => emit(cb)));
         return;
       }
       if (b.type === 'code') {
-        children.push(new Paragraph({
+        cur().push(new Paragraph({
           children: [new TextRun({ text: b.text || '', font: 'Consolas', size: Math.round((bodySize - 1) * 2) })],
           shading: { type: ShadingType.CLEAR, fill: 'F6F8FA' }
         }));
@@ -163,8 +179,8 @@
       }
       if (b.type === 'image') {
         const a = assets[b.assetId];
-        if (a) children.push(imagePara(a, b.w, b.h, b.align || 'center'));
-        if (b.caption) children.push(new Paragraph({
+        if (a) cur().push(imagePara(a, b.w, b.h, b.align || 'center'));
+        if (b.caption) cur().push(new Paragraph({
           children: [new TextRun({ text: b.caption, size: Math.round(Math.max(8, bodySize - 1.5) * 2) })],
           alignment: AlignmentType.CENTER,
           spacing: { after: 120 }
@@ -184,7 +200,7 @@
         const rows = (b.rows || []).map(row => new TableRow({
           children: row.map(c => cellOf(c || { text: '' }, widths))
         }));
-        children.push(new Table({
+        cur().push(new Table({
           rows,
           width: { size: 100, type: WidthType.PERCENTAGE },
           columnWidths: widths,
@@ -197,13 +213,38 @@
             insideVertical: { style: BorderStyle.SINGLE, size: 4, color: '888888' }
           }
         }));
-        children.push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 0 } }));
+        cur().push(new Paragraph({ children: [new TextRun({ text: '' })], spacing: { after: 0 } }));
         return;
       }
-      children.push(paraOf(b, bodySize));
+      cur().push(paraOf(b, bodySize));
     };
     for (const b of ir.blocks) emit(b);
     if (!children.length) children.push(new Paragraph({ children: [new TextRun({ text: '（空文档）' })] }));
+
+    /**
+     * 组装 sections：
+     *   · 主内容放第一节
+     *   · 每个"分栏容器"单独一节，并设置 column.count = 栏数
+     *     → Word 里就是真正的双栏，而不是被拍平的单栏
+     */
+    const pageProps = {
+      size: { width: Math.round(pageW * TWIP_PER_PT), height: Math.round(pageH * TWIP_PER_PT) },
+      margin: {
+        top: Math.round(m[1] * TWIP_PER_PT), right: Math.round(m[2] * TWIP_PER_PT),
+        bottom: Math.round(m[3] * TWIP_PER_PT), left: Math.round(m[0] * TWIP_PER_PT)
+      }
+    };
+    const sections = [{ properties: { page: pageProps }, children: children }];
+    for (const ps of pendingSections) {
+      sections.push({
+        properties: {
+          page: pageProps,
+          /* docx 库用 section 的 column 属性生成 w:cols（Word 的分栏） */
+          column: { count: ps.count, space: Math.round(12 * TWIP_PER_PT), separate: false }
+        },
+        children: ps.children
+      });
+    }
 
     const doc = new Document({
       creator: '灵译',
@@ -219,18 +260,7 @@
           ]
         }]
       },
-      sections: [{
-        properties: {
-          page: {
-            size: { width: Math.round(pageW * TWIP_PER_PT), height: Math.round(pageH * TWIP_PER_PT) },
-            margin: {
-              top: Math.round(m[1] * TWIP_PER_PT), right: Math.round(m[2] * TWIP_PER_PT),
-              bottom: Math.round(m[3] * TWIP_PER_PT), left: Math.round(m[0] * TWIP_PER_PT)
-            }
-          }
-        },
-        children
-      }]
+      sections: sections
     });
 
     return Packer.toBlob(doc).then(blob => ({ blob, filename: (opts.fileName || 'translated') + '.docx' }));

@@ -28,6 +28,7 @@ const origPath = path.join(__dirname, 'samples', 'sample1.docx-inspect.json');
 if (!fs.existsSync(htmlPath) || !fs.existsSync(origPath)) {
   console.log('缺少真实 Word 样本，跳过 real-docx.test.js');
   console.log('（公开仓库里不含真实论文原稿；可用 python test/tools/docx2html.py <你的.docx> <输出.html> 补上）');
+  console.log('\n结果：通过 0 项，失败 0 项（缺少真实样本，已跳过）');
   process.exit(0);
 }
 const html = fs.readFileSync(htmlPath, 'utf8');

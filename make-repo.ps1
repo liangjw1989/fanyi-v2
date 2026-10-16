@@ -46,6 +46,7 @@ $include = @(
   'check-github-channel.bat',
   '.gitignore',
   'dist\index.html',          # 单文件版应用（构建产物，可直接部署到 GitHub Pages）
+  'vendor',                   # 本地第三方库（docx 等），保证离线可用
   'app',
   'src',
   'build.js',

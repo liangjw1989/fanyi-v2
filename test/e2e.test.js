@@ -109,7 +109,7 @@ function installMockApi(sandbox, dict) {
     // 公开仓库里不带真实论文原稿（含患者数据/未发表内容），测试自动跳过
     console.log('  （未找到真实样本 test/samples/sample1.mammoth-like.html，跳过 Word 端到端；');
     console.log('    运行 python test/tools/docx2html.py <你的.docx> <输出.html> 即可补上）');
-    console.log('\n结果：通过 0 项，失败 0 项（已跳过）');
+    console.log('\n结果：通过 0 项，失败 0 项（缺少真实样本，已跳过）');
     process.exit(0);
   }
   const html = fs.readFileSync(htmlPath, 'utf8');

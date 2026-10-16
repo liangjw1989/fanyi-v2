@@ -314,9 +314,16 @@
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.2.0';
+  const VERSION = '2.3.0';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
-  const OUT_FMT = { docx: 'Word（版式最完整）', pdf: 'PDF（浏览器打印导出）', html: 'HTML 网页', bilingual: '中英对照网页', txt: '纯文本' };
+  const OUT_FMT = {
+    docx: 'Word（版式最完整）',
+    pdf: 'PDF（自动弹出打印，另存为 PDF）',
+    'bilingual-stack': '原文译文对照（上下排列）',
+    bilingual: '原文译文对照（左右分栏）',
+    html: 'HTML 网页',
+    txt: '纯文本'
+  };
   const LS_TERMS = 'lingyi_terms_v1';
   const LS_OPTS = 'lingyi_options_v1';
   const LS_API = 'lingyi_api_url_v1';
@@ -355,11 +362,18 @@
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     if (typeof blobOrUrl !== 'string') setTimeout(() => URL.revokeObjectURL(a.href), 60000);
   }
-  function openHtmlInNewTab(html, title) {
+  function openHtmlInNewTab(html, title, autoPrint) {
     const w = window.open('', '_blank');
     if (!w) { showToast('浏览器阻止了新窗口，请允许弹窗', true); return; }
     w.document.open(); w.document.write(html); w.document.close();
     w.document.title = title || '灵译输出';
+    /* 选择"PDF"时直接把打印对话框弹出来：一步就能「另存为 PDF」，
+       不需要用户再去点页面里的打印按钮（原来要两次操作）。 */
+    if (autoPrint) {
+      const go = () => { try { w.focus(); w.print(); } catch (e) { /* 用户可手动点打印 */ } };
+      if (w.document.readyState === 'complete') setTimeout(go, 400);
+      else w.addEventListener('load', () => setTimeout(go, 400));
+    }
   }
 
   /* ==================== 上传与列表 ==================== */
@@ -781,11 +795,18 @@
       blob = r.blob; outName = r.filename;
       html = rh.renderDocument(ir, opts);
     } else if (f.outFmt === 'pdf') {
-      html = rh.renderDocument(ir, opts);
+      html = rh.renderDocument(ir, Object.assign({ autoPrint: true }, opts));
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       outName = outBase + '.html';
-      openHtmlInNewTab(html, outName);
-      showToast('已在新窗口打开：请在打印对话框中选择「另存为 PDF」', false);
+      /* 自动弹出打印对话框 → 选「另存为 PDF」即可，不用再点一次 */
+      openHtmlInNewTab(html, outName, true);
+      showToast('已打开打印窗口：目标选择「另存为 PDF」即可保存', false);
+    } else if (f.outFmt === 'bilingual-stack') {
+      html = rh.renderStackedBilingual(ir, Object.assign({ autoPrint: true }, opts));
+      blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      outName = outBase + '-对照.html';
+      openHtmlInNewTab(html, outName, true);
+      showToast('已打开上下对照（原文在上、译文在下），可直接打印为 PDF', false);
     } else if (f.outFmt === 'bilingual') {
       html = rh.renderBilingualDocument(ir, opts);
       blob = new Blob([html], { type: 'text/html;charset=utf-8' });
