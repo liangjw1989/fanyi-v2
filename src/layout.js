@@ -237,16 +237,69 @@
       if (c.lines.length < minMinor) continue;
       if (c.lines.length >= body.lines.length) continue;
       const cX0 = Math.min.apply(null, c.lines.map(l => l.x0));
-      const cX1 = Math.max.apply(null, c.lines.map(l => l.x1));
-      /* 必须完全不重叠（留 2pt 余量）*/
-      const overlaps = Math.min(bodyX1, cX1) - Math.max(bodyX0, cX0) > -2;
-      if (overlaps) continue;
+      const cX1P75 = percentile(c.lines.map(l => l.x1), 0.75);
+      /* 【关键】不能用"最大 x1"判断重叠：边注栏偶尔有一两条很长的行
+       * 越过正文起点（实测 MDPI 的版权声明就是），用最大值判据会整体失效。
+       * 改用 P75 分位：只要绝大多数（75%）边注行都结束在正文起点左侧，
+       * 就认为两栏是分开的。 */
+      const separated = cX1P75 <= bodyX0 - 4;
+      if (!separated) continue;
       const minor = c.lines.slice().sort((a, b) => a.y0 - b.y0);
       const rest = lines.filter(l => c.lines.indexOf(l) < 0);
       /* 边注在左 → 先输出边注；在右 → 先输出主栏 */
-      return cX1 <= bodyX0 ? [minor, rest] : [rest, minor];
+      return cX0 < bodyX0 ? [minor, rest] : [rest, minor];
     }
     return null;
+  }
+
+  /** 取分位数（用于"少数长行不影响整体判据"的重叠判断） */
+  function percentile(arr, q) {
+    if (!arr || !arr.length) return 0;
+    const s = arr.slice().sort((a, b) => a - b);
+    const i = Math.min(s.length - 1, Math.max(0, Math.floor(s.length * q)));
+    return s[i];
+  }
+
+  /**
+   * 把"横跨宽空档"的行拆成多条。
+   *
+   * 为什么需要它：期刊版式里「窄左边注栏 + 宽正文栏」的两栏内容常常落在
+   * 相同基线上，groupLines 只看 y 就把它们合并成一条行，其文本变成
+   *   "Licensee MDPI, Basel, Switzerland.are not discussed"
+   * 这正是用户看到"句子被截断"的真正原因。
+   *
+   * 为什么不在 groupLines 里做：表格单元格之间本来就是大空白，
+   * 在那里加水平间距判据会破坏表格识别（实测 9 项失败）。
+   * 所以只在"分栏判定失败"的兜底路径里做，且门槛随字号缩放：
+   *   · 空档 ≥ max(20pt, 字号×2)（正文 10pt → 20pt；远大于词间距）
+   *   · 该行总宽 ≥ 内容宽的 55%（否则不像"跨两栏"）
+   *   · 空档左侧片段宽度 < 内容宽的一半（左边注窄）
+   */
+  function splitWideGapLines(lines, contentW, minGap) {
+    const out = [];
+    for (const ln of lines) {
+      const items = (ln.items || []).slice().sort((a, b) => a.x0 - b.x0);
+      if (items.length < 2) { out.push(ln); continue; }
+      const spanW = (ln.x1 || 0) - (ln.x0 || 0);
+      if (spanW < contentW * 0.55) { out.push(ln); continue; }
+      const sizeRef = ln.size || 10;
+      const gapMin = minGap || Math.max(20, sizeRef * 2);
+      /* 找最宽的内部空档 */
+      let best = null;
+      for (let i = 1; i < items.length; i++) {
+        const g = items[i].x0 - items[i - 1].x1;
+        if (g >= gapMin && (!best || g > best.gap)) best = { gap: g, at: i };
+      }
+      if (!best) { out.push(ln); continue; }
+      const leftW = items[best.at - 1].x1 - items[0].x0;
+      if (leftW >= contentW * 0.5) { out.push(ln); continue; }
+      /* 拆成两条（各自保持原有 y 与字号） */
+      out.push(finishLine(items.slice(0, best.at), ln.size));
+      out.push(finishLine(items.slice(best.at), ln.size));
+    }
+    /* 拆完可能顺序乱，重新按 y 排（同行按 x 排）*/
+    out.sort((a, b) => (a.y0 - b.y0) || (a.x0 - b.x0));
+    return out;
   }
 
   function analyzePage(items, opts) {
@@ -258,11 +311,21 @@
     // 在"片段级"找竖直走廊：分栏排版里，中缝上横跨的片段极少（通常只有通栏标题/公式）。
     const corridor = findColumnCorridor(items, opts);
     if (!corridor) {
-      /* 走廊检测失败时尝试"窄边注栏"兜底（MDPI 类版式常见）。
-         若成功，直接返回两块独立区域，避免正文与边注逐行交错。 */
-      const split = splitMarginalColumn(initialLines, opts);
+      /* 兜底一：先把"横跨两栏的行"在宽空档处拆开。
+         期刊的窄边注栏与正文常落在同一基线上，被合并成一条行，
+         其文本会变成 "版权声明.正文..." —— 必须拆开才能正确分段。 */
+      const contentW = (opts && opts.pageWidth)
+        ? opts.pageWidth
+        : (Math.max.apply(null, items.map(i => i.x1)) - Math.min.apply(null, items.map(i => i.x0)));
+      const splitLines = splitWideGapLines(initialLines, contentW, opts && opts.wideGap);
+      /* 兜底二：按"行首 x 聚类"找窄边注栏（MDPI 类版式常见） */
+      const split = splitMarginalColumn(splitLines, opts);
       if (split && split[0].length && split[1].length) {
         return [mkLineRegion(split[0], 0, false), mkLineRegion(split[1], 0, false)];
+      }
+      /* 拆过行的话，用拆后的行构造区域（文本已不再跨栏拼接） */
+      if (splitLines.length > initialLines.length) {
+        return [mkLineRegion(splitLines, 0)];
       }
       return [mkLineRegion(initialLines, 0)];
     }
@@ -542,7 +605,7 @@
 
   return {
     EPS, width, height, centerX, centerY, unionBox, overlap1d, crossingCount,
-    groupLines, lineMaxGap, lineGaps, findVerticalGutters, findColumnCorridor, splitMarginalColumn,
+    groupLines, lineMaxGap, lineGaps, findVerticalGutters, findColumnCorridor, splitMarginalColumn, splitWideGapLines, percentile,
     analyzePage, analyzeLines, mkLineRegion, regionize, orderRegionsByFlow,
     detectTable
   };
