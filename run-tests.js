@@ -12,6 +12,7 @@ const os = require('os');
 
 const SUITES = [
   ['layout.test.js', '版式算法（分行/分栏/表格/页边距/标题层级）'],
+  ['marker-decode.test.js', '占位符编解码（容忍引擎插空格）'],
   ['glossary.test.js', '术语库 · 符号保护 · 翻译记忆'],
   ['real-docx.test.js', '真实 Word 稿结构还原'],
   ['real-pdf.test.js', '真实 PDF 双栏版式还原'],

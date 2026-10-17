@@ -114,6 +114,23 @@ const HTML = `<html><body>
   if (missing.length === 0) ok('抽查的 8 类符号全部原样保留：' + mustKeep.join(' / '));
   else no('下列符号未原样出现: ' + missing.join(' '));
 
+  /* ---- 关键：检查译文里是否残留"标记垃圾" ----
+   * 真实故障：腾讯云把 ##P0## 输出成 "## P0 ##"，旧的解码正则
+   * 只认 "##V12##"（无空格），导致残留 "#P0 ##" 这类字符混进正文。
+   * 之前只检查"符号有没有回来"，没检查"垃圾字符有没有留下"，所以漏检了。 */
+  console.log('\n[4b] 译文里是否残留标记垃圾（#P0# / ##P1 ## / ⟦P2⟧ 未还原）');
+  const garbage = [];
+  const patterns = [
+    { re: /#{1,2}\s*[VPT]?\s*\d+\s*#{0,2}/g, name: '井号标记残留' },
+    { re: /\u27e6\s*[VPT]?\s*\d+\s*\u27e7/g, name: '⟦⟧ 占位符未还原' }
+  ];
+  for (const p of patterns) {
+    const hits = allText.match(p.re);
+    if (hits) garbage.push(p.name + ': ' + [...new Set(hits)].slice(0, 6).join(' '));
+  }
+  if (!garbage.length) ok('没有任何标记垃圾残留');
+  else no('发现标记垃圾 → ' + garbage.join('；'));
+
   console.log('\n[5] 表格结构');
   const tb = ir.blocks.find(b => b.type === 'table');
   if (tb) {

@@ -276,6 +276,27 @@
    *   · 空档左侧片段宽度 < 内容宽的一半（左边注窄）
    */
   function splitWideGapLines(lines, contentW, minGap) {
+    /* 【重要】如果这一页本身像表格，就完全不拆。
+     * 表格行的单元格之间本来就有大空档（甚至 40~80pt），
+     * 拆行会把表格彻底拆散（实测让"表格数量 1 → 0"）。
+     * 判定：至少 2 行、且多数行有 ≥2 个列块、且列块左边界对齐。 */
+    if (lines && lines.length >= 2) {
+      const multi = lines.filter(l => (l.items || []).length >= 2);
+      if (multi.length >= Math.ceil(lines.length * 0.5)) {
+        /* 看这些"多列块"的行，其第二块的起始 x 是否稳定对齐 */
+        const starts = [];
+        for (const l of multi) {
+          const s = (l.items || []).slice().sort((a, b) => a.x0 - b.x0);
+          if (s.length >= 2) starts.push(Math.round(s[1].x0 / 6) * 6);
+        }
+        const freq = {};
+        starts.forEach(x => { freq[x] = (freq[x] || 0) + 1; });
+        const maxFreq = Math.max.apply(null, Object.keys(freq).map(k => freq[k]).concat([0]));
+        if (starts.length >= 3 && maxFreq >= Math.ceil(starts.length * 0.6)) {
+          return lines;                    // 像表格 → 不拆
+        }
+      }
+    }
     const out = [];
     for (const ln of lines) {
       const items = (ln.items || []).slice().sort((a, b) => a.x0 - b.x0);

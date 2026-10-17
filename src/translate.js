@@ -58,11 +58,18 @@
   function encodeMarkers(text) {
     return String(text == null ? '' : text).replace(TOKEN_RE, (m, kind, num) => MT_OPEN + (kind || 'V') + num + MT_CLOSE);
   }
-  /** 收到后：##V12## → ⟦12⟧，##P3## → ⟦P3⟧ */
+  /** 收到后：##V12## → ⟦12⟧，##P3## → ⟦P3⟧
+   * 【健壮性】机器翻译会在标记内部插空格，实测腾讯云把 ##P0## 输出成
+   * "## P0 ##"。旧正则只匹配 "##V12##" 这种无空格形式，导致
+   * "##P0##" 只被替换掉半边，正文里残留 "#P0 ##" 这样的垃圾字符。
+   * 这里允许 ## 与字母、字母与数字之间出现空白。 */
   function decodeMarkers(text) {
     return String(text == null ? '' : text)
-      .replace(/##\s*V(\d+)\s*##/g, (m, n) => core.SEG_OPEN + n + core.SEG_CLOSE)
-      .replace(/##\s*([PT])(\d+)\s*##/g, (m, k, n) => core.SEG_OPEN + k + n + core.SEG_CLOSE);
+      .replace(/##\s*V\s*(\d+)\s*##/g, (m, n) => core.SEG_OPEN + n + core.SEG_CLOSE)
+      .replace(/##\s*([PT])\s*(\d+)\s*##/g, (m, k, n) => core.SEG_OPEN + k + n + core.SEG_CLOSE)
+      /* 兜底：只剩半边 ## 的残缺标记（如 "#P0 ##"、"##P0 #"）直接清掉，
+         避免脏字符进入译文。这些位置本来就是要被占位符替换的。 */
+      .replace(/#{1,2}\s*([PT])\s*(\d+)\s*#*/g, (m, k, n) => core.SEG_OPEN + k + n + core.SEG_CLOSE);
   }
   /** 统计一段文本里所有标记的数量（用于发现引擎丢标记） */
   function countMarkers(text) {
@@ -325,7 +332,7 @@
         }
 
         let tries = 0;
-        const maxUnitRetry = (u.items && u.items.length) ? (opts.unitRetries == null ? 2 : opts.unitRetries) : 0;
+        const maxUnitRetry = (u.items && u.items.length) ? (opts.unitRetries == null ? 4 : opts.unitRetries) : 0;
         while (lost.length && tries < maxUnitRetry) {
           tries++;
           try {
