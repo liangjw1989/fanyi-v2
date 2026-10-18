@@ -358,17 +358,22 @@
     const initialLines = splitWideGapLines(rawLines, contentW, opts && opts.wideGap);
 
     // 在"片段级"找竖直走廊：分栏排版里，中缝上横跨的片段极少（通常只有通栏标题/公式）。
+    /* 先试"窄边注栏切分"：对 MDPI 这类「宽正文 + 窄左边注」最可靠。
+     *
+     * 为什么要在走廊之前：实测该论文能找到一条（错误的）走廊位于正文内部
+     * （x≈404），于是走廊分支先命中，边注/正文的切分逻辑永远不执行，
+     * 结果整页还是 1 个区域、正文与版权声明逐段交替。
+     * 这里的判据很保守（边注 ≥3 行、P75 分离、主体行数 ≥ 边注 1.2 倍），
+     * 平衡双栏（行数接近）不会命中，因此不会误伤。
+     */
+    const marginal = splitMarginalColumn(initialLines, opts);
+    if (marginal && marginal[0].length && marginal[1].length) {
+      return [mkLineRegion(marginal[0], 0, false), mkLineRegion(marginal[1], 0, false)];
+    }
+
     const corridor = findColumnCorridor(items, opts);
     if (!corridor) {
-      /* 没找到走廊：按"行首 x 聚类"找窄边注栏（MDPI 类版式常见） */
-      const split = splitMarginalColumn(initialLines, opts);
-      if (split && split[0].length && split[1].length) {
-        return [mkLineRegion(split[0], 0, false), mkLineRegion(split[1], 0, false)];
-      }
-      /* 拆过行的话，用拆后的行构造区域（文本已不再跨栏拼接） */
-      if (initialLines.length > rawLines.length) {
-        return [mkLineRegion(initialLines, 0)];
-      }
+      /* 没找到走廊：用拆后的行构造区域（文本已不再跨栏拼接） */
       return [mkLineRegion(initialLines, 0)];
     }
 
@@ -440,13 +445,34 @@
     const splitAt = midSpans.length ? midSpans[0].y0 : Infinity;
     for (const colLines of [leftLines, rightLines]) {
       let cur = [];
+      /* 只在"第一次"遇到中部通栏行的位置切一刀。
+       * 原写法在每一行都判断 l.y0 >= splitAt，导致 splitAt 之后
+       * 每一行都单独成一个区域 —— 实测某页因此炸出 17 个碎片区域。 */
+      let cutDone = false;
       for (const l of colLines) {
-        if (l.y0 >= splitAt && cur.length) { out.push(mkLineRegion(cur, 0)); cur = []; }
+        if (!cutDone && l.y0 >= splitAt && cur.length) {
+          out.push(mkLineRegion(cur, 0));
+          cur = [];
+          cutDone = true;
+        }
         cur.push(l);
       }
       if (cur.length) out.push(mkLineRegion(cur, 0));
     }
-    for (const l of midSpans) out.push(mkLineRegion([l], 0, true));
+    /* 中部的通栏行：把"相邻的"通栏行合并成一个区域。
+     * 原来是每条通栏行单独成一个区域，页面上一有通栏内容
+     * （表标题、公式、图注）就会炸出十几个碎片区域。 */
+    let run = [];
+    let prevY = null;
+    for (const l of midSpans) {
+      if (prevY != null && l.y0 - prevY > Math.max(12, (l.size || 10) * 2.2)) {
+        if (run.length) out.push(mkLineRegion(run, 0, true));
+        run = [];
+      }
+      run.push(l);
+      prevY = l.y0;
+    }
+    if (run.length) out.push(mkLineRegion(run, 0, true));
     return out.length ? out : [mkLineRegion(initialLines, 0)];
   }
 
