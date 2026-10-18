@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <!--
-  灵译 LingYi · 文档翻译与版式还原引擎  v2.4.2
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.5.0
   © 2026 LingYi. All rights reserved.
   许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
   本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
@@ -3040,7 +3040,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.4.2 | sha256:a45836627fffed43 | 2026-10-18 -->
+<!-- build: v2.5.0 | sha256:e970e27242f7d251 | 2026-10-18 -->
 </body></html>`;
   }
 
@@ -4603,10 +4603,11 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.4.2';
+  const VERSION = '2.5.0';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
-    docx: 'Word（版式最完整）',
+    'pdf-overlay': 'PDF 叠加（原版式 100% 保真·图片型·译文不可选中）',
+    docx: 'Word（版式最完整·可编辑）',
     pdf: 'PDF（弹出打印，文件名已预填 .pdf）',
     'bilingual-stack': '原文译文对照（上下排列）',
     bilingual: '原文译文对照（左右分栏）',
@@ -4644,6 +4645,59 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
   }
   function bytes(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : (n / 1024).toFixed(0) + ' KB'; }
   function baseName(name) { return String(name).replace(/\.[^.]+$/, ''); }
+
+  /**
+   * 叠加输出专用：把每页的"行"合并成"段落块"。
+   * 合并条件（保守）：同一起始 x（±6pt）、垂直间距 < 1.15 倍字号。
+   * 块用于两件事：① 作为翻译单元（整段翻译质量远好于逐行）
+   *                ② 作为涂白/写译文的位置框
+   */
+  function buildOverlayBlocks(pages) {
+    return pages.map(p => {
+      const lines = (p.lines || [])
+        .filter(l => l && l.text && String(l.text).trim())
+        .slice()
+        .sort((a, b) => (a.y - b.y) || (a.x - b.x));
+      const blocks = [];
+      let cur = null;
+      for (const l of lines) {
+        const size = l.size || 10;
+        const x1 = (l.x1 != null) ? l.x1 : (l.x + Math.max(40, String(l.text).length * size * 0.5));
+        if (cur && Math.abs(l.x - cur.x) <= 6 && (l.y - cur.yEnd) < Math.max(3.2, size * 1.15)) {
+          /* 同一段落：接上。中英文之间补空格，避免单词粘连 */
+          const prev = cur.text;
+          const next = String(l.text).trim();
+          const needSpace = /[A-Za-z0-9]$/.test(prev) && /^[A-Za-z0-9(]/.test(next);
+          cur.text = prev + (needSpace ? ' ' : '') + next;
+          cur.yEnd = l.y + size;
+          cur.x1 = Math.max(cur.x1, x1);
+        } else {
+          if (cur) blocks.push(cur);
+          cur = {
+            x: Math.round(l.x * 10) / 10,
+            y: Math.round(l.y * 10) / 10,
+            yEnd: l.y + size,
+            x1: x1,
+            size: size,
+            text: String(l.text).trim()
+          };
+        }
+      }
+      if (cur) blocks.push(cur);
+      return {
+        number: p.number,
+        width: p.width,
+        height: p.height,
+        blocks: blocks.map(b => ({
+          x: b.x, y: b.y,
+          w: Math.max(40, b.x1 - b.x),
+          h: Math.max(b.size * 1.1, b.yEnd - b.y),
+          size: b.size,
+          text: b.text
+        }))
+      };
+    });
+  }
   function download(blobOrUrl, filename) {
     const a = document.createElement('a');
     a.href = typeof blobOrUrl === 'string' ? blobOrUrl : URL.createObjectURL(blobOrUrl);
@@ -5136,6 +5190,86 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     setStage(f);
 
     const terms = gloss.parseTerms($('termsText').value);
+
+    /* ---------------- 叠加输出：原 PDF 页面上直接覆盖译文 ----------------
+     * 这条分支不做"PDF→结构重建"，因此不存在分栏/表格猜错的问题：
+     * 原页画成图（版式天然 100% 保真），在原文字位置涂白、写译文。
+     * 译文是像素，不可选中；要可选中请走"原位替换+嵌入字体"路线。 */
+    if (f.outFmt === 'pdf-overlay') {
+      if (f.ext !== 'pdf') {
+        throw new Error('「PDF 叠加」需要 PDF 输入（Word/TXT 请选 Word 输出，能保留真正的版式）');
+      }
+      const ov = window.LingyiPdfOverlay;
+      if (!ov) throw new Error('叠加渲染模块未加载成功，请刷新页面');
+      const pages = (ir.pages || []).filter(p => (p.lines || []).length);
+      if (!pages.length) throw new Error('没有解析到页面文字，无法叠加（可能是扫描件）');
+
+      /* 1) 把每页的行按"同栏、相邻"合并成段落块 */
+      const pageBlocks = buildOverlayBlocks(pages);
+      const flat = [];
+      pageBlocks.forEach(p => p.blocks.forEach(b => flat.push(b)));
+
+      /* 2) 用临时 IR 走完整翻译流水线（自动获得术语库/符号保护/翻译记忆） */
+      const tmpIr = {
+        blocks: flat.map(b => ({ type: 'paragraph', runs: [{ t: b.text }] }))
+      };
+      const res = await tr.translateIR(tmpIr, {
+        apiUrl: apiUrl,
+        target: f.targetLang,
+        engine: f.engine,
+        mode: f.engine === 'deepseek' ? 'polish' : 'normal',
+        terms: terms,
+        useTM: settings.useTM,
+        protectSymbols: settings.protectSymbols,
+        onProgress: (done, total, msg) => {
+          f.progress = 30 + Math.round(done / Math.max(1, total) * 50);
+          f.message = msg;
+          setStage(f);
+        }
+      });
+      flat.forEach((b, i) => {
+        const nb = tmpIr.blocks[i];
+        const t = nb && nb.runs ? core.runsToText(nb.runs) : '';
+        if (t && t.trim()) b.text = t;
+      });
+      refreshTMStats();
+
+      /* 3) 渲染叠加 PDF */
+      f.progress = 85;
+      f.message = `正在渲染 ${pageBlocks.length} 页（原版式保真）…`;
+      setStage(f);
+      const srcBytes = new Uint8Array(await f.file.arrayBuffer());
+      const overlayBase = baseName(f.name) + '-灵译-' +
+        (f.targetLang === 'zh-CN' ? '中文' : String(f.targetLang).toUpperCase());
+      const rendered = await ov.renderOverlay({
+        pdfBytes: srcBytes,
+        pdfjs: window.pdfjsLib,
+        pages: pageBlocks,
+        title: overlayBase,
+        onProgress: (done, total) => {
+          f.progress = 85 + Math.round(done / Math.max(1, total) * 13);
+          f.message = `渲染第 ${done}/${total} 页…`;
+          setStage(f);
+        }
+      });
+
+      const fileName = overlayBase + '-叠加.pdf';
+      const blob = new Blob([rendered.bytes], { type: 'application/pdf' });
+      f.status = 'done'; f.progress = 100; f.message = '完成';
+      state.files = state.files.filter(x => x.id !== f.id);
+      state.completed.push({
+        id: f.id, name: f.name, outName: fileName, blob: blob, html: null,
+        outFmt: 'docx',                 // 有真实文件，显示"下载"
+        diag: f._diag || null,
+        summary: `叠加输出 ${rendered.pageCount} 页 · 成功 ${res.translated} 块 · 版式按原 PDF`
+      });
+      addRecord(f, fileName);
+      renderFiles(); renderCompleted();
+      download(blob, fileName);
+      showToast('已生成叠加 PDF（版式与原 PDF 一致，译文不可选中）');
+      return;
+    }
+
     const result = await tr.translateIR(ir, {
       apiUrl: apiUrl,
       target: f.targetLang,
