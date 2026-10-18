@@ -152,10 +152,17 @@
         lineCount: p.lines ? p.lines.length : (p.lineCount || null),
         lines: (p.lines || []).slice(0, 80).map(l => ({
           x: Math.round(l.x != null ? l.x : (l.x0 || 0)),
+          /* 行尾 x1 也要带上：判断"窄边注栏是否与正文重叠"必须靠它 */
+          x1: Math.round(l.x1 != null ? l.x1 : ((l.x != null ? l.x : (l.x0 || 0)) + 1)),
           y: Math.round(l.y != null ? l.y : (l.y0 || 0)),
           size: l.size,
           text: clip(l.text || (l.items ? l.items.map(i => i.str).join('') : ''))
-        }))
+        })),
+        /* 原始文字项坐标与 x 直方图：定位"中缝在哪"最直接的证据。
+           解析层 pageMeta 里已经记录了，但这里忘了输出，导致报告缺字段。 */
+        itemCount: p.itemCount,
+        xHistogram: p.xHistogram || null,
+        itemSamples: p.itemSamples || null
       })),
       blocks: blocks
     };

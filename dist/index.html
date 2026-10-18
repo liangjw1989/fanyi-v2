@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <!--
-  灵译 LingYi · 文档翻译与版式还原引擎  v2.3.0
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.4.0
   © 2026 LingYi. All rights reserved.
   许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
   本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
@@ -255,7 +255,7 @@
       </div>
 
       <div style="margin-top:0.7rem; font-size:0.75rem; color:#94a3b8; line-height:1.7;">
-        版本 <span id="appVersion">—</span> · © 2026 灵译 LingYi · 个人使用免费，商业使用需获得授权。
+        版本 <span id="appVersion">—</span>
       </div>
     </div>
 
@@ -2993,7 +2993,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.3.0 | sha256:f13181445f48bd51 | 2026-10-17 -->
+<!-- build: v2.4.0 | sha256:a71bfd1951437051 | 2026-10-18 -->
 </body></html>`;
   }
 
@@ -3870,10 +3870,17 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
         lineCount: p.lines ? p.lines.length : (p.lineCount || null),
         lines: (p.lines || []).slice(0, 80).map(l => ({
           x: Math.round(l.x != null ? l.x : (l.x0 || 0)),
+          /* 行尾 x1 也要带上：判断"窄边注栏是否与正文重叠"必须靠它 */
+          x1: Math.round(l.x1 != null ? l.x1 : ((l.x != null ? l.x : (l.x0 || 0)) + 1)),
           y: Math.round(l.y != null ? l.y : (l.y0 || 0)),
           size: l.size,
           text: clip(l.text || (l.items ? l.items.map(i => i.str).join('') : ''))
-        }))
+        })),
+        /* 原始文字项坐标与 x 直方图：定位"中缝在哪"最直接的证据。
+           解析层 pageMeta 里已经记录了，但这里忘了输出，导致报告缺字段。 */
+        itemCount: p.itemCount,
+        xHistogram: p.xHistogram || null,
+        itemSamples: p.itemSamples || null
       })),
       blocks: blocks
     };
@@ -4549,7 +4556,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.3.0';
+  const VERSION = '2.4.0';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     docx: 'Word（版式最完整）',
@@ -4710,26 +4717,55 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       completedEl.innerHTML = '<div style="color:#94a3b8; text-align:center; padding:2rem;">暂无完成的文档</div>';
       return;
     }
-    completedEl.innerHTML = state.completed.map(f => `
+    /* 按钮按"输出格式"决定：
+     *   · Word / 纯文本 → 下载
+     *   · PDF / 对照    → 打印为 PDF（浏览器里只有打印引擎能产出带中文的真 PDF；
+     *                     若给"下载"，下到的会是 HTML —— 这正是"选 PDF 却得到 .htm"的原因）
+     *   · HTML          → 预览 + 保存 HTML */
+    completedEl.innerHTML = state.completed.map(f => {
+      const fmt = f.outFmt || 'docx';
+      const isPrint = (fmt === 'pdf' || fmt === 'bilingual-stack' || fmt === 'bilingual');
+      const isFile = (fmt === 'docx' || fmt === 'txt');
+      const btns = [];
+      if (fmt === 'html' || isPrint) {
+        btns.push(`<button class="btn btn-outline btn-sm preview-btn" data-id="${f.id}">预览</button>`);
+      }
+      if (isPrint) {
+        btns.push(`<button class="btn btn-primary btn-sm print-btn" data-id="${f.id}">🖨 打印为 PDF</button>`);
+      }
+      if (fmt === 'html') {
+        btns.push(`<button class="btn btn-outline btn-sm dump-btn" data-id="${f.id}">保存 HTML</button>`);
+      }
+      if (isFile) {
+        btns.push(`<button class="btn btn-primary btn-sm download-btn2" data-id="${f.id}">下载</button>`);
+      }
+      btns.push(`<button class="btn btn-danger btn-sm remove-completed" data-id="${f.id}">删除</button>`);
+      return `
       <div class="file-item">
         <i class="fas fa-check-circle" style="color:#10b981;"></i>
         <div class="file-info">
           <div class="file-name">${escapeHtml(f.outName)}</div>
           <div class="stage-hint">${escapeHtml(f.name)} · ${escapeHtml(f.summary || '')}</div>
         </div>
-        <div class="file-actions">
-          <button class="btn btn-outline btn-sm preview-btn" data-id="${f.id}">预览</button>
-          <button class="btn btn-outline btn-sm dump-btn" data-id="${f.id}">转存 HTML</button>
-          <button class="btn btn-primary btn-sm download-btn2" data-id="${f.id}">下载</button>
-          <button class="btn btn-danger btn-sm remove-completed" data-id="${f.id}">删除</button>
-        </div>
-      </div>`).join('');
+        <div class="file-actions">${btns.join('')}</div>
+      </div>`;
+    }).join('');
   }
   completedEl.addEventListener('click', e => {
     const id = parseInt(e.target.dataset.id, 10);
     const item = state.completed.find(x => x.id === id);
     if (!item) return;
-    if (e.target.classList.contains('download-btn2')) download(item.blob, item.outName);
+    if (e.target.classList.contains('download-btn2')) {
+      if (!item.blob) { showToast('该输出没有可下载的文件', true); return; }
+      download(item.blob, item.outName);
+    }
+    /* 「打印为 PDF」：重新打开打印窗口。浏览器里没有中文字体文件，
+       只有打印引擎能渲染出正确的中文 PDF，所以 PDF 输出走这条路。 */
+    if (e.target.classList.contains('print-btn')) {
+      if (!item.html) { showToast('没有可打印的排版结果', true); return; }
+      openHtmlInNewTab(item.html, item.outName, true);
+      showToast('打印对话框里「目标」选「另存为 PDF」即可保存', false);
+    }
     if (e.target.classList.contains('preview-btn')) {
       if (item.html) openHtmlInNewTab(item.html, item.outName);
       else if (item.blob) download(item.blob, item.outName);
@@ -5127,6 +5163,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
        "还没有可诊断的解析结果"。 */
     state.completed.push({
       id: f.id, name: f.name, outName: outName, blob: blob, html: html,
+      outFmt: f.outFmt,                 // 按格式决定显示哪些按钮（PDF 走打印，不当文件下载）
       diag: f._diag || null,
       summary: `成功 ${result.translated} 段 / 保留 ${result.fallback} 段`
     });
