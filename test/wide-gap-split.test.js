@@ -113,6 +113,34 @@ console.log('\n=== 4) 窄行（总宽 < 60% 内容宽）不参与拆分 ===');
   check('窄行保持原样', split.length === 1, '实际 ' + split.length);
 }
 
+console.log('\n=== 6) 空档很小但起始位置大幅跳变（真实 MDPI 情形）===');
+{
+  /* 真实数据：边注 x1≈153，正文 x≈166 → 空档只有 13pt（小于 20pt 门槛），
+     但起始位置从 35.7 跳到 166（跳变 130pt）。必须靠"起始跳变"判据拆开。 */
+  const items = [];
+  items.push({ str: 'Citation:', x0: 35.7, x1: 63.4, y0: 329.7, y1: 336.7, size: 7, font: 'f', pageHeight: 842 });
+  items.push({ str: 'Kyrgiafini, M.-A.; Mamuris,', x0: 65.6, x1: 151.6, y0: 329.7, y1: 336.7, size: 7, font: 'f', pageHeight: 842 });
+  items.push({
+    str: 'the main body text continues here and spans the wide right column of the page',
+    x0: 166, x1: 559, y0: 329.7, y1: 339.7, size: 10, font: 'f', pageHeight: 842
+  });
+  const lines = L.groupLines(items);
+  console.log('    groupLines → ' + lines.length + ' 行');
+  check('前提：被合并成 1 行（同基线）', lines.length === 1, '实际 ' + lines.length);
+  if (lines.length === 1) {
+    const merged = txt(lines[0]);
+    console.log('    空档 ' + Math.round((166 - 151.6) * 10) / 10 + 'pt   起始跳变 ' +
+      Math.round((166 - 35.7) * 10) / 10 + 'pt');
+    const split = L.splitWideGapLines(lines, 526, undefined);
+    console.log('    拆开后: ' + split.length + ' 行');
+    split.forEach((l, i) => console.log('      ' + i + '. x=' + Math.round(l.x0) + '~' +
+      Math.round(l.x1) + ' ' + JSON.stringify(txt(l).slice(0, 46))));
+    check('被拆成 2 行（靠起始跳变判据）', split.length === 2, '实际 ' + split.length);
+    check('边注行不含正文', split.some(l => txt(l).indexOf('Citation') >= 0 && txt(l).indexOf('main body') < 0));
+    check('正文行不含边注', split.some(l => txt(l).indexOf('main body text') >= 0 && txt(l).indexOf('Citation') < 0));
+  }
+}
+
 console.log('\n=== 5) 整页端到端：拆行后边注与正文分开 ===');
 {
   /* MDPI 式整页：边注与正文同行（y 相同）→ 必须拆开后归入不同区域 */

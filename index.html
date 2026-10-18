@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <!--
-  灵译 LingYi · 文档翻译与版式还原引擎  v2.4.0
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.4.1
   © 2026 LingYi. All rights reserved.
   许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
   本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
@@ -1078,11 +1078,23 @@
       if (spanW < contentW * 0.55) { out.push(ln); continue; }
       const sizeRef = ln.size || 10;
       const gapMin = minGap || Math.max(20, sizeRef * 2);
-      /* 找最宽的内部空档 */
+      /* 找"栏分界"：两种信号
+       *   ① 空档够宽（gap ≥ 20pt）—— 常见于双栏正文
+       *   ② 起始位置突然跳远（x0 跳变 ≥ 内容宽 15%）
+       *      这一条很重要：实测期刊边注栏到正文的空档只有 13pt（小于门槛），
+       *      但起始 x 从 35.7 跳到 166（跳变 130pt），这才是"另一栏开始"的标志。
+       */
+      const jumpMin = Math.max(60, contentW * 0.15);
       let best = null;
       for (let i = 1; i < items.length; i++) {
-        const g = items[i].x0 - items[i - 1].x1;
-        if (g >= gapMin && (!best || g > best.gap)) best = { gap: g, at: i };
+        const gap = items[i].x0 - items[i - 1].x1;
+        const jump = items[i].x0 - items[0].x0;
+        const prevJump = items[i - 1].x0 - items[0].x0;
+        const startJump = jump - prevJump;
+        let score = 0;
+        if (gap >= gapMin) score = gap;
+        else if (startJump >= jumpMin) score = startJump * 0.6;   // 跳变信号略降权
+        if (score > 0 && (!best || score > best.score)) best = { score: score, at: i, gap: gap, jump: startJump };
       }
       if (!best) { out.push(ln); continue; }
       const leftW = items[best.at - 1].x1 - items[0].x0;
@@ -1099,27 +1111,36 @@
   function analyzePage(items, opts) {
     opts = opts || {};
     if (!items.length) return [];
-    const initialLines = groupLines(items);
-    if (initialLines.length < 6) return [mkLineRegion(initialLines, 0)];
+    const rawLines = groupLines(items);
+    if (rawLines.length < 6) return [mkLineRegion(rawLines, 0)];
+
+    /* ------------------------------------------------------------------
+     * 第一步（关键）：先拆"横跨两栏的行"，再做任何分栏判断。
+     *
+     * 为什么必须最先做：期刊（MDPI 等）的窄左边注栏与宽正文栏常落在同一
+     * 基线上，groupLines 只看 y 就把它们合并成一条行 —— 实测某论文的边注
+     * 行 x1 一直延伸到 559（正文右边界），文本变成
+     *   "Male Infertility: A Systematic Review.正文内容..."
+     * 这样合并后边注与正文的 x 区间完全重叠，任何"两栏分离"判据都失效。
+     *
+     * 安全性：splitWideGapLines 内部有表格保护（整页像表格就完全不拆）。
+     * ---------------------------------------------------------------- */
+    const contentW = (opts && opts.pageWidth)
+      ? opts.pageWidth
+      : (Math.max.apply(null, items.map(i => i.x1)) - Math.min.apply(null, items.map(i => i.x0)));
+    const initialLines = splitWideGapLines(rawLines, contentW, opts && opts.wideGap);
 
     // 在"片段级"找竖直走廊：分栏排版里，中缝上横跨的片段极少（通常只有通栏标题/公式）。
     const corridor = findColumnCorridor(items, opts);
     if (!corridor) {
-      /* 兜底一：先把"横跨两栏的行"在宽空档处拆开。
-         期刊的窄边注栏与正文常落在同一基线上，被合并成一条行，
-         其文本会变成 "版权声明.正文..." —— 必须拆开才能正确分段。 */
-      const contentW = (opts && opts.pageWidth)
-        ? opts.pageWidth
-        : (Math.max.apply(null, items.map(i => i.x1)) - Math.min.apply(null, items.map(i => i.x0)));
-      const splitLines = splitWideGapLines(initialLines, contentW, opts && opts.wideGap);
-      /* 兜底二：按"行首 x 聚类"找窄边注栏（MDPI 类版式常见） */
-      const split = splitMarginalColumn(splitLines, opts);
+      /* 没找到走廊：按"行首 x 聚类"找窄边注栏（MDPI 类版式常见） */
+      const split = splitMarginalColumn(initialLines, opts);
       if (split && split[0].length && split[1].length) {
         return [mkLineRegion(split[0], 0, false), mkLineRegion(split[1], 0, false)];
       }
       /* 拆过行的话，用拆后的行构造区域（文本已不再跨栏拼接） */
-      if (splitLines.length > initialLines.length) {
-        return [mkLineRegion(splitLines, 0)];
+      if (initialLines.length > rawLines.length) {
+        return [mkLineRegion(initialLines, 0)];
       }
       return [mkLineRegion(initialLines, 0)];
     }
@@ -2993,7 +3014,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.4.0 | sha256:a71bfd1951437051 | 2026-10-18 -->
+<!-- build: v2.4.1 | sha256:d5a4cb13c1903d3d | 2026-10-18 -->
 </body></html>`;
   }
 
@@ -4556,7 +4577,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.4.0';
+  const VERSION = '2.4.1';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     docx: 'Word（版式最完整）',
