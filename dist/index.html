@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <!--
-  灵译 LingYi · 文档翻译与版式还原引擎  v2.6.0
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.6.1
   © 2026 LingYi. All rights reserved.
   许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
   本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
@@ -3057,7 +3057,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.6.0 | sha256:cbd25d2ef51b97e9 | 2026-10-21 -->
+<!-- build: v2.6.1 | sha256:30fbcdd64ee28864 | 2026-10-21 -->
 </body></html>`;
   }
 
@@ -5510,7 +5510,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.6.0';
+  const VERSION = '2.6.1';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -5710,7 +5710,14 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     if (!f) return;
     if (e.target.classList.contains('lang-select')) f.targetLang = e.target.value;
     if (e.target.classList.contains('engine-select')) f.engine = e.target.value;
-    if (e.target.classList.contains('fmt-select')) f.outFmt = e.target.value;
+    if (e.target.classList.contains('fmt-select')) {
+      f.outFmt = e.target.value;
+      /* 选了「PDF 原位替换」但还没选字体时，立刻引导去选 —— 不要等点翻译才报错 */
+      if (f.outFmt === 'pdf-inplace' && !fontBytes) {
+        showToast('该输出需要中文字体，已为你打开字体设置', true);
+        guideToFontPicker();
+      }
+    }
   });
   listEl.addEventListener('click', async e => {
     const id = parseInt(e.target.dataset.id, 10);
@@ -5953,6 +5960,101 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       p.style.display = p.style.display === 'none' ? 'block' : 'none';
       refreshTMStats();
     });
+
+    /* ---- 中文字体持久化（IndexedDB，只选一次）----
+     * localStorage 装不下 9MB 字体，所以用 IndexedDB。
+     * 字体仍然**只存在本机浏览器里**，不上传服务器。 */
+    const FontStore = {
+      dbName: 'lingyi_font_v1',
+      open() {
+        return new Promise((res, rej) => {
+          if (!window.indexedDB) { rej(new Error('浏览器不支持 IndexedDB')); return; }
+          const r = indexedDB.open(this.dbName, 1);
+          r.onupgradeneeded = () => {
+            if (!r.result.objectStoreNames.contains('font')) r.result.createObjectStore('font');
+          };
+          r.onsuccess = () => res(r.result);
+          r.onerror = () => rej(r.error || new Error('IndexedDB 打开失败'));
+        });
+      },
+      async put(name, bytes) {
+        const db = await this.open();
+        return new Promise((res, rej) => {
+          const tx = db.transaction('font', 'readwrite');
+          tx.objectStore('font').put({ name: name, bytes: bytes }, 'cjk');
+          tx.oncomplete = () => res(true);
+          tx.onerror = () => rej(tx.error);
+        });
+      },
+      async get() {
+        const db = await this.open();
+        return new Promise((res, rej) => {
+          const tx = db.transaction('font', 'readonly');
+          const q = tx.objectStore('font').get('cjk');
+          q.onsuccess = () => res(q.result || null);
+          q.onerror = () => rej(q.error);
+        });
+      },
+      async del() {
+        const db = await this.open();
+        return new Promise((res, rej) => {
+          const tx = db.transaction('font', 'readwrite');
+          tx.objectStore('font').delete('cjk');
+          tx.oncomplete = () => res(true);
+          tx.onerror = () => rej(tx.error);
+        });
+      }
+    };
+
+    /** 把字体信息显示到状态行 */
+    function showFontReady(name, len) {
+      const F = window.LingyiPdfFont;
+      let glyphs = '';
+      try { glyphs = '，' + F.parseTtf(fontBytes, 0).numGlyphs + ' 个字形'; } catch (e) { }
+      $('fontStatus').innerHTML = '✓ <b>' + escapeHtml(name) + '</b>（' +
+        (len / 1024 / 1024).toFixed(1) + ' MB' + glyphs + '）已就绪，可重复使用';
+    }
+
+    /** 引导用户去选字体：展开面板 + 滚动过去 + 闪烁提示 */
+    function guideToFontPicker() {
+      const p = $('toolsPanel');
+      p.style.display = 'block';
+      const box = $('fontFile');
+      if (!box) return;
+      try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { box.scrollIntoView(); }
+      /* 用一个明显的呼吸动画把注意力引过去 */
+      const host = $('fontStatus');
+      if (host) {
+        host.innerHTML = '⚠️ <b>请在这里选择中文字体</b>：点下面的「选择文件」，选 <code>C:\\Windows\\Fonts\\simhei.ttf</code>';
+        host.style.color = '#dc2626';
+        host.style.fontWeight = '600';
+        let n = 0;
+        const timer = setInterval(() => {
+          n++;
+          host.style.opacity = (n % 2) ? '0.35' : '1';
+          if (n > 10) { clearInterval(timer); host.style.opacity = '1'; }
+        }, 260);
+      }
+      setTimeout(() => { try { box.focus(); } catch (e) { } }, 400);
+    }
+
+    /* 启动时尝试恢复上次选择的字体 */
+    (async function restoreFont() {
+      try {
+        const rec = await FontStore.get();
+        if (!rec || !rec.bytes || !rec.bytes.length) return;
+        fontBytes = rec.bytes instanceof Uint8Array ? rec.bytes : new Uint8Array(rec.bytes);
+        fontName = rec.name || '已保存的字体';
+        /* 验证一次，避免旧数据格式不对 */
+        window.LingyiPdfFont.parseTtf(fontBytes, 0);
+        showFontReady(fontName, fontBytes.length);
+        $('fontStatus').style.color = '#16a34a';
+      } catch (e) {
+        /* 恢复失败就静默忽略，用户可以重新选 */
+        fontBytes = null; fontName = '';
+      }
+    })();
+
     $('optProtectSymbols').addEventListener('change', e => {
       const cur = loadOptions(); cur.protectSymbols = e.target.checked; saveOptions(cur);
     });
@@ -6066,29 +6168,37 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       const file = e.target.files && e.target.files[0];
       if (!file) return;
       const st = $('fontStatus');
-      st.textContent = '正在读取 ' + file.name + ' …';
+      st.style.color = '#94a3b8';
+      st.textContent = '正在读取并校验 ' + file.name + ' …';
       try {
         const buf = new Uint8Array(await file.arrayBuffer());
-        /* 先用解析器验证一下，避免用户选到 .ttc 或损坏文件后才发现 */
+        /* 先解析一次验证：避免选了 .ttc / CFF 轮廓 / 损坏文件后才发现 */
         const F = window.LingyiPdfFont;
-        if (!F) throw new Error('字体解析模块未加载');
-        const info = F.parseTtf(buf, 0);
+        if (!F) throw new Error('字体解析模块未加载，请刷新页面');
+        F.parseTtf(buf, 0);
         fontBytes = buf;
         fontName = file.name;
-        st.innerHTML = '✓ 已载入 <b>' + escapeHtml(file.name) + '</b>（' +
-          (buf.length / 1024 / 1024).toFixed(1) + ' MB，' + info.numGlyphs + ' 个字形）';
-        showToast('字体已就绪，可选用「PDF 原位替换」输出');
+        st.style.color = '#16a34a';
+        showFontReady(file.name, buf.length);
+        showToast('字体已就绪，之后会自动记住，不用再选');
+        /* 存进 IndexedDB，下次刷新仍然可用 */
+        try { await FontStore.put(file.name, buf); }
+        catch (e) { /* 存不下也不影响本次使用 */ }
       } catch (err) {
         fontBytes = null; fontName = '';
         e.target.value = '';
+        st.style.color = '#dc2626';
         st.textContent = '✗ ' + err.message;
         showToast(err.message, true);
       }
     });
-    $('fontClearBtn').addEventListener('click', () => {
+    $('fontClearBtn').addEventListener('click', async () => {
       fontBytes = null; fontName = '';
       $('fontFile').value = '';
-      $('fontStatus').textContent = '尚未选择字体';
+      const st = $('fontStatus');
+      st.style.color = '#94a3b8';
+      st.textContent = '尚未选择字体';
+      try { await FontStore.del(); } catch (e) { }
     });
   }
 
@@ -6148,9 +6258,8 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       if (!ov) throw new Error('叠加渲染模块未加载成功，请刷新页面');
       if (isInPlace && !ip) throw new Error('原位替换模块未加载成功，请刷新页面');
       if (isInPlace && !fontBytes) {
-        $('toolsPanel').style.display = 'block';
-        $('fontFile').focus();
-        throw new Error('「原位替换」需要先选择中文字体：打开「⚙️ 术语库…」面板 → 「🔤 中文字体」→ 选择 C:\\Windows\\Fonts\\simhei.ttf');
+        guideToFontPicker();          // 展开面板 + 滚动到控件 + 闪烁提示
+        throw new Error('「原位替换」需要中文字体：已为你展开面板，请点「选择文件」选 C:\\Windows\\Fonts\\simhei.ttf（只需选一次，之后会自动记住）');
       }
       const pages = (ir.pages || []).filter(p => (p.lines || []).length);
       if (!pages.length) throw new Error('没有解析到页面文字，无法生成（可能是扫描件）');
