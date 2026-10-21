@@ -23,9 +23,9 @@ console.log('语法检查：通过 ' + ok + ' 个，失败 ' + bad + ' 个');
 
 /* 必需模块是否都在（打包版看内联，源码版看 ./src/ 引用） */
 const MODULES = ['core.js', 'layout.js', 'docx-extract.js', 'pdf-extract.js', 'render-html.js',
-  'render-docx.js', 'render-pdf-overlay.js', 'glossary.js', 'diagnostics.js', 'tm.js', 'translate.js'];
+  'render-docx.js', 'render-pdf-overlay.js', 'pdf-font.js', 'render-pdf-inplace.js', 'glossary.js', 'diagnostics.js', 'tm.js', 'translate.js'];
 const NAMES = ['LingyiCore', 'LingyiLayout', 'LingyiDocx', 'LingyiPdfExtract', 'LingyiRenderHtml',
-  'LingyiRenderDocx', 'LingyiPdfOverlay', 'LingyiGlossary', 'LingyiDiagnostics', 'LingyiTM', 'LingyiTranslate'];
+  'LingyiRenderDocx', 'LingyiPdfOverlay', 'LingyiPdfFont', 'LingyiPdfInPlace', 'LingyiGlossary', 'LingyiDiagnostics', 'LingyiTM', 'LingyiTranslate'];
 let missingModule = 0;
 if (useDist) {
   NAMES.forEach((n, i) => {

@@ -215,6 +215,23 @@
 
       <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
 
+      <!-- 中文字体：仅在「PDF 原位替换（可选中）」输出时需要。
+           字体只在你本机使用、不上传，所以没有版权与网络问题。 -->
+      <div style="font-weight:600; margin-bottom:0.4rem;">🔤 中文字体（用于「PDF 原位替换·可选中」）</div>
+      <div style="font-size:0.75rem; color:#94a3b8; line-height:1.6; margin-bottom:0.5rem;">
+        选一个<b>单一 .ttf</b> 中文字体即可（不要 .ttc 集合）。Windows 可用
+        <code>C:\Windows\Fonts\simhei.ttf</code>。<b>字体只在本机使用，不会上传</b>。
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-bottom:0.5rem;">
+        <input type="file" id="fontFile" accept=".ttf,.otf" style="font-size:0.78rem;">
+        <button class="btn btn-outline btn-sm" id="fontClearBtn">清除</button>
+      </div>
+      <div id="fontStatus" style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.6rem;">
+        尚未选择字体
+      </div>
+
+      <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
+
       <div style="font-weight:600; margin-bottom:0.6rem;">🛡️ 翻译质量控制</div>
 
       <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; margin-bottom:0.4rem;">
@@ -310,6 +327,9 @@
 <script src="./src/pdf-extract.js"></script>
 <script src="./src/render-html.js"></script>
 <script src="./src/render-docx.js"></script>
+<script src="./src/render-pdf-overlay.js"></script>
+<script src="./src/pdf-font.js"></script>
+<script src="./src/render-pdf-inplace.js"></script>
 <script src="./src/glossary.js"></script>
 <script src="./src/diagnostics.js"></script>
 <script src="./src/tm.js"></script>
@@ -333,10 +353,11 @@
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.5.0';
+  const VERSION = '2.6.0';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
-    'pdf-overlay': 'PDF 叠加（原版式 100% 保真·图片型·译文不可选中）',
+    'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
+    'pdf-overlay': 'PDF 叠加（原版式保真·图片型·不可选中）',
     docx: 'Word（版式最完整·可编辑）',
     pdf: 'PDF（弹出打印，文件名已预填 .pdf）',
     'bilingual-stack': '原文译文对照（上下排列）',
@@ -344,6 +365,10 @@
     html: 'HTML 网页',
     txt: '纯文本'
   };
+  /* 用户选择的中文字体（只在内存里，刷新即失效；不上传、不落盘）*/
+  let fontBytes = null;
+  let fontName = '';
+
   const LS_TERMS = 'lingyi_terms_v1';
   const LS_OPTS = 'lingyi_options_v1';
   const LS_API = 'lingyi_api_url_v1';
@@ -878,6 +903,36 @@
       $('diagStatus').textContent = '已导出可读摘要（' + Math.round(txt.length / 1024) + ' KB）';
       showToast('可读摘要已下载');
     });
+
+    /* ---- 中文字体选择（供「PDF 原位替换」使用）---- */
+    $('fontFile').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const st = $('fontStatus');
+      st.textContent = '正在读取 ' + file.name + ' …';
+      try {
+        const buf = new Uint8Array(await file.arrayBuffer());
+        /* 先用解析器验证一下，避免用户选到 .ttc 或损坏文件后才发现 */
+        const F = window.LingyiPdfFont;
+        if (!F) throw new Error('字体解析模块未加载');
+        const info = F.parseTtf(buf, 0);
+        fontBytes = buf;
+        fontName = file.name;
+        st.innerHTML = '✓ 已载入 <b>' + escapeHtml(file.name) + '</b>（' +
+          (buf.length / 1024 / 1024).toFixed(1) + ' MB，' + info.numGlyphs + ' 个字形）';
+        showToast('字体已就绪，可选用「PDF 原位替换」输出');
+      } catch (err) {
+        fontBytes = null; fontName = '';
+        e.target.value = '';
+        st.textContent = '✗ ' + err.message;
+        showToast(err.message, true);
+      }
+    });
+    $('fontClearBtn').addEventListener('click', () => {
+      fontBytes = null; fontName = '';
+      $('fontFile').value = '';
+      $('fontStatus').textContent = '尚未选择字体';
+    });
   }
 
   /* ==================== 主流程 ==================== */
@@ -921,18 +976,27 @@
 
     const terms = gloss.parseTerms($('termsText').value);
 
-    /* ---------------- 叠加输出：原 PDF 页面上直接覆盖译文 ----------------
-     * 这条分支不做"PDF→结构重建"，因此不存在分栏/表格猜错的问题：
-     * 原页画成图（版式天然 100% 保真），在原文字位置涂白、写译文。
-     * 译文是像素，不可选中；要可选中请走"原位替换+嵌入字体"路线。 */
-    if (f.outFmt === 'pdf-overlay') {
+    /* -------- 不走"结构重建"的两条 PDF 输出路线（版式零推断）--------
+     *   pdf-inplace：原页做底图 + 白底 + **真文字**译文（内嵌字体）→ 可选中
+     *   pdf-overlay：原页做底图 + 白底 + 画布上的译文（像素）→ 不可选中，但不需要字体
+     * 两者都不猜分栏/表格，所以版式与原 PDF 完全一致。 */
+    if (f.outFmt === 'pdf-overlay' || f.outFmt === 'pdf-inplace') {
+      const isInPlace = (f.outFmt === 'pdf-inplace');
+      const label = isInPlace ? 'PDF 原位替换' : 'PDF 叠加';
       if (f.ext !== 'pdf') {
-        throw new Error('「PDF 叠加」需要 PDF 输入（Word/TXT 请选 Word 输出，能保留真正的版式）');
+        throw new Error('「' + label + '」需要 PDF 输入（Word/TXT 请选 Word 输出，能保留真正的版式）');
       }
       const ov = window.LingyiPdfOverlay;
+      const ip = window.LingyiPdfInPlace;
       if (!ov) throw new Error('叠加渲染模块未加载成功，请刷新页面');
+      if (isInPlace && !ip) throw new Error('原位替换模块未加载成功，请刷新页面');
+      if (isInPlace && !fontBytes) {
+        $('toolsPanel').style.display = 'block';
+        $('fontFile').focus();
+        throw new Error('「原位替换」需要先选择中文字体：打开「⚙️ 术语库…」面板 → 「🔤 中文字体」→ 选择 C:\\Windows\\Fonts\\simhei.ttf');
+      }
       const pages = (ir.pages || []).filter(p => (p.lines || []).length);
-      if (!pages.length) throw new Error('没有解析到页面文字，无法叠加（可能是扫描件）');
+      if (!pages.length) throw new Error('没有解析到页面文字，无法生成（可能是扫描件）');
 
       /* 1) 把每页的行按"同栏、相邻"合并成段落块 */
       const pageBlocks = buildOverlayBlocks(pages);
@@ -964,26 +1028,44 @@
       });
       refreshTMStats();
 
-      /* 3) 渲染叠加 PDF */
+      /* 3) 渲染（按所选路线走不同渲染器） */
       f.progress = 85;
-      f.message = `正在渲染 ${pageBlocks.length} 页（原版式保真）…`;
+      f.message = isInPlace
+        ? `正在生成可选中 PDF（${pageBlocks.length} 页，内嵌字体）…`
+        : `正在渲染 ${pageBlocks.length} 页（原版式保真）…`;
       setStage(f);
       const srcBytes = new Uint8Array(await f.file.arrayBuffer());
       const overlayBase = baseName(f.name) + '-灵译-' +
         (f.targetLang === 'zh-CN' ? '中文' : String(f.targetLang).toUpperCase());
-      const rendered = await ov.renderOverlay({
-        pdfBytes: srcBytes,
-        pdfjs: window.pdfjsLib,
-        pages: pageBlocks,
-        title: overlayBase,
-        onProgress: (done, total) => {
-          f.progress = 85 + Math.round(done / Math.max(1, total) * 13);
-          f.message = `渲染第 ${done}/${total} 页…`;
-          setStage(f);
-        }
-      });
+      let rendered;
+      if (isInPlace) {
+        rendered = await ip.renderInPlace({
+          pdfBytes: srcBytes,
+          pdfjs: window.pdfjsLib,
+          pages: pageBlocks,
+          fontBytes: fontBytes,
+          title: overlayBase,
+          onProgress: (done, total) => {
+            f.progress = 85 + Math.round(done / Math.max(1, total) * 13);
+            f.message = `渲染第 ${done}/${total} 页…`;
+            setStage(f);
+          }
+        });
+      } else {
+        rendered = await ov.renderOverlay({
+          pdfBytes: srcBytes,
+          pdfjs: window.pdfjsLib,
+          pages: pageBlocks,
+          title: overlayBase,
+          onProgress: (done, total) => {
+            f.progress = 85 + Math.round(done / Math.max(1, total) * 13);
+            f.message = `渲染第 ${done}/${total} 页…`;
+            setStage(f);
+          }
+        });
+      }
 
-      const fileName = overlayBase + '-叠加.pdf';
+      const fileName = overlayBase + (isInPlace ? '-原位.pdf' : '-叠加.pdf');
       const blob = new Blob([rendered.bytes], { type: 'application/pdf' });
       f.status = 'done'; f.progress = 100; f.message = '完成';
       state.files = state.files.filter(x => x.id !== f.id);
@@ -991,12 +1073,15 @@
         id: f.id, name: f.name, outName: fileName, blob: blob, html: null,
         outFmt: 'docx',                 // 有真实文件，显示"下载"
         diag: f._diag || null,
-        summary: `叠加输出 ${rendered.pageCount} 页 · 成功 ${res.translated} 块 · 版式按原 PDF`
+        summary: (isInPlace ? '原位替换' : '叠加输出') + ` ${rendered.pageCount} 页 · 成功 ${res.translated} 块 · 版式按原 PDF` +
+          (isInPlace ? ` · 用到 ${rendered.usedGlyphs} 个字形 · 字体 ${(rendered.fontBytes / 1024 / 1024).toFixed(1)}MB` : '')
       });
       addRecord(f, fileName);
       renderFiles(); renderCompleted();
       download(blob, fileName);
-      showToast('已生成叠加 PDF（版式与原 PDF 一致，译文不可选中）');
+      showToast(isInPlace
+        ? '已生成可选中 PDF（版式与原 PDF 一致，译文可选中/搜索）'
+        : '已生成叠加 PDF（版式与原 PDF 一致，译文不可选中）');
       return;
     }
 

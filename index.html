@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <!--
-  灵译 LingYi · 文档翻译与版式还原引擎  v2.5.0
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.6.0
   © 2026 LingYi. All rights reserved.
   许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
   本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
@@ -217,6 +217,23 @@
       </div>
       <div id="diagStatus" style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.6rem;">
         提示：上传文件、等它解析完成（出现"解析完成"）即可导出，不必等翻译完。注意刷新页面会清空。
+      </div>
+
+      <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
+
+      <!-- 中文字体：仅在「PDF 原位替换（可选中）」输出时需要。
+           字体只在你本机使用、不上传，所以没有版权与网络问题。 -->
+      <div style="font-weight:600; margin-bottom:0.4rem;">🔤 中文字体（用于「PDF 原位替换·可选中」）</div>
+      <div style="font-size:0.75rem; color:#94a3b8; line-height:1.6; margin-bottom:0.5rem;">
+        选一个<b>单一 .ttf</b> 中文字体即可（不要 .ttc 集合）。Windows 可用
+        <code>C:\Windows\Fonts\simhei.ttf</code>。<b>字体只在本机使用，不会上传</b>。
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-bottom:0.5rem;">
+        <input type="file" id="fontFile" accept=".ttf,.otf" style="font-size:0.78rem;">
+        <button class="btn btn-outline btn-sm" id="fontClearBtn">清除</button>
+      </div>
+      <div id="fontStatus" style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.6rem;">
+        尚未选择字体
       </div>
 
       <hr style="border:0; border-top:1px dashed #e2e8f0; margin:0.8rem 0;">
@@ -3040,7 +3057,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.5.0 | sha256:e970e27242f7d251 | 2026-10-18 -->
+<!-- build: v2.6.0 | sha256:cbd25d2ef51b97e9 | 2026-10-21 -->
 </body></html>`;
   }
 
@@ -3478,6 +3495,896 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
 
   return { renderDocx };
 });
+
+</script>
+<!-- ==================== render-pdf-overlay.js ==================== -->
+<script>
+/* render-pdf-overlay.js — 原图叠加：在原 PDF 页面上覆盖译文，导出图片型 PDF
+ *
+ * 为什么需要它（过渡方案）：
+ *   让 PDF 忠实还原版式是"PDF→结构重建"这条路的死穴 —— PDF 里只有字形坐标，
+ *   没有栏/表/段的概念，任何一种启发式都会在复杂期刊版式上出错。
+ *
+ *   叠加方案绕开这个问题：**直接把原 PDF 每页画成图**，版式天然 100% 保真
+ *   （表格、图、公式、页眉页脚都在原位置），然后在原文字位置涂白、写译文。
+ *
+ * 代价：译文是画在像素上的，不可选中/搜索；文件较大。
+ * 因此它是过渡方案；真正的长期方案是"原位替换文字 + 嵌入中文字体子集"
+ * （见 docs/PDF版式还原的技术路线.md）。
+ */
+(function (root) {
+  'use strict';
+
+  /* ---------------------------------------------------------------- 工具 */
+
+  /** 估算一行文字宽度（按字符类型加权：中文=1em，西文≈0.5em） */
+  function measure(text, size) {
+    let w = 0;
+    for (const ch of String(text || '')) {
+      const c = ch.codePointAt(0);
+      if (c >= 0x2e80) w += size;                 // CJK / 全角
+      else if (ch === ' ') w += size * 0.28;
+      else w += size * 0.52;
+    }
+    return w;
+  }
+
+  /** 按最大宽度折行（中文按字断行，西文按词断行；输出会去掉行尾空白） */
+  function wrapText(text, size, maxW) {
+    const out = [];
+    let line = '';
+    let w = 0;
+    const tokens = String(text || '').match(/[\u2e80-\u9fff\u3000-\u303f\uff00-\uffef]|[^\s\u2e80-\u9fff]+|\s+/g) || [];
+    for (const tk of tokens) {
+      const tw = measure(tk, size);
+      if (w + tw > maxW && line.trim()) {
+        out.push(line.replace(/\s+$/, ''));
+        line = tk.trim() ? tk : '';
+        w = tk.trim() ? tw : 0;
+      } else {
+        line += tk;
+        w += tw;
+      }
+    }
+    if (line.trim()) out.push(line.replace(/\s+$/, ''));
+    return out.length ? out : [''];
+  }
+
+  /* ------------------------------------------------ 极简 PDF（JPEG 图片） */
+
+  /**
+   * 用 JPEG 图片生成 PDF（无需任何字体，因此中文一定正确）。
+   * @param {Array<{w:number,h:number,jpeg:Uint8Array}>} pages 每页一张 JPEG
+   * @param {Object} meta { title }
+   * @returns {Uint8Array}
+   */
+  function buildImagePdf(pages, meta) {
+    meta = meta || {};
+    const enc = new TextEncoder();
+    const chunks = [];
+    let size = 0;
+    const push = (data) => {
+      const b = (data instanceof Uint8Array) ? data : enc.encode(String(data));
+      chunks.push(b);
+      size += b.length;
+    };
+    /* 记录每个对象在文件中的字节偏移，供 xref 使用。
+     * 注意：必须用 size（已写入字节数）作为偏移，不能另设一个从不更新的
+     * 计数器 —— 那样 xref 全部指向错误位置，PDF 阅读器会报文件损坏。 */
+    const offsets = {};
+    const markObj = (n) => { offsets[n] = size; };
+    const pushObj = (n, head, body) => {
+      markObj(n);
+      push(enc.encode(head));
+      if (body) push(body);
+      push('\n');
+    };
+
+    push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+
+    /* 对象编号：1=Catalog, 2=Pages, 3=Info,
+       之后每页 4 个对象：Page, Contents, ImageXObject, 以及字体不需要 */
+    const objBase = 4;
+    const pageObj = (i) => objBase + i * 3;
+    const contentObj = (i) => objBase + i * 3 + 1;
+    const imageObj = (i) => objBase + i * 3 + 2;
+
+    pushObj(1, '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+    const kids = pages.map((p, i) => pageObj(i) + ' 0 R').join(' ');
+    pushObj(2, '2 0 obj\n<< /Type /Pages /Count ' + pages.length + ' /Kids [' + kids + '] >>\nendobj\n');
+    const title = String(meta.title || 'PDF').replace(/[()\\]/g, ' ');
+    pushObj(3, '3 0 obj\n<< /Title (' + title + ') /Producer (LingYi) >>\nendobj\n');
+
+    pages.forEach((p, i) => {
+      const w = Math.round(p.w), h = Math.round(p.h);
+      /* Page */
+      pushObj(pageObj(i),
+        pageObj(i) + ' 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + w + ' ' + h + ']' +
+        ' /Resources << /XObject << /Im0 ' + imageObj(i) + ' 0 R >> >>' +
+        ' /Contents ' + contentObj(i) + ' 0 R >>\nendobj\n');
+      /* Contents：把整页图片铺满 */
+      const cs = 'q\n' + w + ' 0 0 ' + h + ' 0 0 cm\n/Im0 Do\nQ\n';
+      const csBytes = enc.encode(cs);
+      pushObj(contentObj(i),
+        contentObj(i) + ' 0 obj\n<< /Length ' + csBytes.length + ' >>\nstream\n');
+      push(csBytes);
+      push('endstream\nendobj\n');
+      /* Image XObject（JPEG 直接用 DCTDecode，不需要重新编码） */
+      pushObj(imageObj(i),
+        imageObj(i) + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + p.pxW +
+        ' /Height ' + p.pxH + ' /ColorSpace /DeviceRGB /BitsPerComponent 8' +
+        ' /Filter /DCTDecode /Length ' + p.jpeg.length + ' >>\nstream\n');
+      push(p.jpeg);
+      push('\nendstream\nendobj\n');
+    });
+
+    /* xref */
+    const total = objBase + pages.length * 3;
+    const xrefPos = size;
+    let xref = 'xref\n0 ' + total + '\n0000000000 65535 f \n';
+    for (let n = 1; n < total; n++) {
+      const off = offsets[n] || 0;
+      xref += String(off).padStart(10, '0') + ' 00000 n \n';
+    }
+    push(xref);
+    push('trailer\n<< /Size ' + total + ' /Root 1 0 R /Info 3 0 R >>\nstartxref\n' + xrefPos + '\n%%EOF\n');
+
+    const out = new Uint8Array(size);
+    let at = 0;
+    for (const c of chunks) { out.set(c, at); at += c.length; }
+    return out;
+  }
+
+  /* ------------------------------------------------------------ 主流程 */
+
+  /**
+   * 生成"原图 + 译文叠加"的 PDF。
+   *
+   * @param {Object} o
+   * @param {Uint8Array} o.pdfBytes 原始 PDF 字节
+   * @param {Object}   o.pdfjs    已加载的 pdf.js 库
+   * @param {Array}    o.pages    每页的待覆盖文字块：
+   *        [{ number, width, height, blocks: [{ x, y, w, h, size, text }] }]
+   *        （坐标原点在左上角，单位与 viewport 一致；内部会按 scale 缩放）
+   * @param {number}  [o.scale=2]  渲染倍率（2 = 约 144dpi，清晰且体积可控）
+   * @param {number}  [o.quality=0.85] JPEG 质量
+   * @param {string}  [o.fontFamily] canvas 字体（默认用系统中文字体栈）
+   * @param {Function}[o.onProgress] (done, total)
+   * @returns {Promise<{ bytes: Uint8Array, pageCount: number }>}
+   */
+  async function renderOverlay(o) {
+    const pdfjs = o.pdfjs;
+    if (!pdfjs) throw new Error('缺少 pdf.js');
+    const scale = o.scale || 2;
+    const quality = o.quality == null ? 0.85 : o.quality;
+    const fontFamily = o.fontFamily ||
+      '"Microsoft YaHei","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Source Han Sans SC",sans-serif';
+
+    const doc = await pdfjs.getDocument({ data: o.pdfBytes.slice(0) }).promise;
+    const total = doc.numPages;
+    const metaByNum = new Map((o.pages || []).map(p => [p.number, p]));
+    const outPages = [];
+
+    for (let n = 1; n <= total; n++) {
+      const page = await doc.getPage(n);
+      const vp = page.getViewport({ scale: scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(vp.width);
+      canvas.height = Math.ceil(vp.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+      const info = metaByNum.get(n);
+      if (info && info.blocks && info.blocks.length) {
+        for (const b of info.blocks) {
+          const x = b.x * scale, y = b.y * scale;
+          const w = Math.max(4, (b.w || 200) * scale);
+          const h = Math.max(4, (b.h || (b.size || 10)) * scale);
+          /* 涂白原文（略微外扩，盖住抗锯齿边缘） */
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+          /* 写译文：字号按块高自适应，长度超宽则缩字号 */
+          const size = Math.max(4, (b.size || 10) * scale);
+          const lines = wrapText(b.text || '', size, w);
+          let useSize = size;
+          /* 行数放不下就逐步缩字号 */
+          const maxLines = Math.max(1, Math.floor(h / (useSize * 1.25)));
+          if (lines.length > maxLines) {
+            const k = Math.max(0.55, (h / (lines.length * 1.25)) / useSize);
+            useSize = Math.max(4, size * k);
+          }
+          ctx.font = useSize + 'px ' + fontFamily;
+          ctx.textBaseline = 'top';
+          ctx.fillStyle = '#000';
+          const wrapped = wrapText(b.text || '', useSize, w);
+          const lh = useSize * 1.22;
+          let yy = y;
+          for (let li = 0; li < wrapped.length; li++) {
+            if (yy + lh > y + h + lh * 0.6) break;   // 超出块高就停，避免压到下一块
+            ctx.fillText(wrapped[li], x, yy);
+            yy += lh;
+          }
+        }
+      }
+
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+      const bin = atob(b64);
+      const jpeg = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) jpeg[i] = bin.charCodeAt(i);
+      outPages.push({
+        w: info ? info.width : vp.width / scale,
+        h: info ? info.height : vp.height / scale,
+        pxW: canvas.width, pxH: canvas.height, jpeg: jpeg
+      });
+      if (o.onProgress) o.onProgress(n, total);
+    }
+
+    if (doc.destroy) { try { doc.destroy(); } catch (e) { } }
+    return { bytes: buildImagePdf(outPages, { title: o.title }), pageCount: outPages.length };
+  }
+
+  root.LingyiPdfOverlay = {
+    renderOverlay: renderOverlay,
+    buildImagePdf: buildImagePdf,
+    wrapText: wrapText,
+    measure: measure
+  };
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
+
+</script>
+<!-- ==================== pdf-font.js ==================== -->
+<script>
+/* pdf-font.js — TrueType 字体解析 + PDF 字体对象生成（无外部依赖）
+ *
+ * 为什么自己写：要让译文"可选中、可搜索"，PDF 里必须是真正的文字，
+ * 而这必须嵌入一份中文字体（PDF 内置的 14 个基础字体没有任何中文字形）。
+ * 常规做法依赖 pdf-lib + fontkit（~1.3MB），但本机网络不通，所以这里
+ * 自己解析 TTF 并生成 PDF 所需的字体对象。
+ *
+ * 支持：TrueType（glyf）单一字体；TTC 需调用方指定 face 索引。
+ * 不支持：CFF（OTTO）轮廓 —— 会在 parse 时明确报错，不静默出错。
+ */
+(function (root) {
+  'use strict';
+
+  function tagAt(bytes, off) {
+    return String.fromCharCode(bytes[off], bytes[off + 1], bytes[off + 2], bytes[off + 3]);
+  }
+
+  /**
+   * 解析 TrueType 字体，取出生成 PDF 嵌入字体所需的全部信息。
+   * @param {Uint8Array} bytes
+   * @param {number} [faceIndex=0] TTC 里的字体序号
+   */
+  function parseTtf(bytes, faceIndex) {
+    const b = bytes;
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    const u16 = o => dv.getUint16(o);
+    const i16 = o => dv.getInt16(o);
+    const u32 = o => dv.getUint32(o);
+
+    let base = 0;
+    const sig = tagAt(b, 0);
+    if (sig === 'ttcf') {
+      /* 字体集合：按 faceIndex 找到对应字体的表目录偏移 */
+      const numFonts = u32(8);
+      const idx = Math.min(faceIndex || 0, numFonts - 1);
+      base = u32(12 + idx * 4);
+      if (tagAt(b, base) === 'OTTO') {
+        throw new Error('字体是 CFF 轮廓（OTTO），本模块只支持 TrueType（glyf）轮廓。请换用 simhei.ttf / simfang.ttf 这类 .ttf 字体');
+      }
+    } else if (sig === 'OTTO') {
+      throw new Error('字体是 CFF 轮廓（OTTO），本模块只支持 TrueType（glyf）轮廓。请换用 simhei.ttf / simfang.ttf 这类 .ttf 字体');
+    } else if (u32(base) !== 0x00010000 && sig !== 'true') {
+      throw new Error('不是可识别的 TrueType 字体（首 4 字节 = ' + sig + '）');
+    }
+
+    const numTables = u16(base + 4);
+    const tables = {};
+    for (let i = 0; i < numTables; i++) {
+      const o = base + 12 + i * 16;
+      const tag = tagAt(b, o);
+      tables[tag] = { offset: u32(o + 8), length: u32(o + 12) };
+    }
+    if (!tables.head || !tables.glyf || !tables.loca || !tables.cmap || !tables.hmtx) {
+      throw new Error('字体缺少必需的表（head/glyf/loca/cmap/hmtx）');
+    }
+
+    /* ---- head ---- */
+    const head = tables.head.offset;
+    const unitsPerEm = u16(head + 18);
+    const xMin = i16(head + 36), yMin = i16(head + 38);
+    const xMax = i16(head + 40), yMax = i16(head + 42);
+    const indexToLoc = i16(head + 50);
+
+    /* ---- hhea / maxp ---- */
+    const hhea = tables.hhea.offset;
+    const ascender = i16(hhea + 4), descender = i16(hhea + 6);
+    const numHMetrics = u16(hhea + 34);
+    const numGlyphs = tables.maxp ? u16(tables.maxp.offset + 4) : 0;
+
+    /* ---- post（斜体角）---- */
+    let italicAngle = 0;
+    if (tables.post && tables.post.length >= 8) {
+      italicAngle = dv.getInt32(tables.post.offset + 4) / 65536;
+    }
+
+    /* ---- hmtx：advanceWidth[gid] ---- */
+    const hm = tables.hmtx.offset;
+    const advWidth = new Array(numGlyphs);
+    const lsb = new Array(numGlyphs);
+    let lastAdv = 0;
+    for (let g = 0; g < numGlyphs; g++) {
+      if (g < numHMetrics) {
+        lastAdv = u16(hm + g * 4);
+        advWidth[g] = lastAdv;
+        lsb[g] = i16(hm + g * 4 + 2);
+      } else {
+        advWidth[g] = lastAdv;
+        lsb[g] = i16(hm + numHMetrics * 4 + (g - numHMetrics) * 2);   // 可能越界，忽略
+      }
+    }
+
+    /* ---- cmap：unicode → gid ---- */
+    const cm = parseCmap(b, dv, tables.cmap);
+
+    /* ---- loca（字形偏移），供将来做子集化 ---- */
+    const loca = [];
+    const locOff = tables.loca.offset;
+    if (indexToLoc === 0) {
+      for (let g = 0; g <= numGlyphs; g++) loca.push(u16(locOff + g * 2) * 2);
+    } else {
+      for (let g = 0; g <= numGlyphs; g++) loca.push(u32(locOff + g * 4));
+    }
+
+    return {
+      bytes: b,
+      unitsPerEm: unitsPerEm || 1000,
+      numGlyphs: numGlyphs,
+      bbox: { xMin: xMin, yMin: yMin, xMax: xMax, yMax: yMax },
+      ascender: ascender,
+      descender: descender,
+      italicAngle: italicAngle,
+      advWidth: advWidth,
+      lsb: lsb,
+      /* 返回 gid；找不到返回 0（.notdef） */
+      gidFor: function (cp) {
+        const g = cm.map.get(cp);
+        return (g == null || g >= numGlyphs) ? 0 : g;
+      },
+      /* 某 gid 的 advance（字体单位） */
+      widthOf: function (gid) {
+        return advWidth[gid] || 0;
+      },
+      loca: loca,
+      tables: tables
+    };
+  }
+
+  /** 解析 cmap，返回 Map<codepoint, gid>（优先 format 12，其次 format 4） */
+  function parseCmap(b, dv, tbl) {
+    const u16 = o => dv.getUint16(o);
+    const u32 = o => dv.getUint32(o);
+    const base = tbl.offset;
+    const n = u16(base + 2);
+    let best4 = null, best12 = null;
+    const subs = [];
+    for (let i = 0; i < n; i++) {
+      const o = base + 4 + i * 8;
+      const pid = u16(o), eid = u16(o + 2), off = u32(o + 4);
+      subs.push({ pid: pid, eid: eid, off: base + off });
+    }
+    for (const s of subs) {
+      const fmt = u16(s.off);
+      if (fmt === 12) { if (!best12) best12 = s.off; }
+      else if (fmt === 4) { if (!best4) best4 = s.off; }
+    }
+    const map = new Map();
+    if (best12 != null) {
+      const nGroups = u32(best12 + 12);
+      for (let g = 0; g < nGroups; g++) {
+        const o = best12 + 16 + g * 12;
+        const start = u32(o), end = u32(o + 4), startGid = u32(o + 8);
+        for (let cp = start; cp <= end && cp - start < 0x10000; cp++) {
+          map.set(cp, startGid + (cp - start));
+        }
+      }
+      if (map.size) return { map: map, format: 12 };
+    }
+    if (best4 != null) {
+      const segX2 = u16(best4 + 6);
+      const segCount = segX2 / 2;
+      const endO = best4 + 14;
+      const startO = endO + segX2 + 2;
+      const deltaO = startO + segX2;
+      const rangeO = deltaO + segX2;
+      for (let s = 0; s < segCount; s++) {
+        const end = u16(endO + s * 2);
+        const start = u16(startO + s * 2);
+        const delta = dv.getInt16(deltaO + s * 2);
+        const ro = u16(rangeO + s * 2);
+        if (start === 0xffff) continue;
+        for (let cp = start; cp <= end && cp !== 0xffff; cp++) {
+          let gid;
+          if (ro === 0) {
+            gid = (cp + delta) & 0xffff;
+          } else {
+            const gi = rangeO + s * 2 + ro + (cp - start) * 2;
+            if (gi + 1 > b.length) continue;
+            gid = u16(gi);
+            if (gid !== 0) gid = (gid + delta) & 0xffff;
+          }
+          if (gid) map.set(cp, gid);
+        }
+      }
+      return { map: map, format: 4 };
+    }
+    throw new Error('字体没有可用的 cmap 子表（format 4 / 12）');
+  }
+
+  /* ------------------------------------------------------ PDF 字体对象 */
+
+  /**
+   * 生成 PDF 里嵌入 TrueType 所需的对象内容（不含对象头与 xref）。
+   *
+   * 结构（Identity-H 编码，CIDFontType2）：
+   *   /Type0 字体  →  /DescendantFonts  →  CIDFont
+   *   CIDFont 里 /FontDescriptor 引用 /FontFile2（整个字体文件）
+   *   /Encoding /Identity-H  → 文本用 2 字节 glyph id 表示
+   *   /ToUnicode 提供 gid → unicode 映射（复制、搜索要靠它）
+   *
+   * @param {Object} font parseTtf 的返回值
+   * @param {Map<number,number>} used Map<gid, codepoint>，只列实际用到的字
+   * @returns {{ resources:string, objects:Array<{dict:string, stream?:Uint8Array}>, scale:number }}
+   */
+  function buildFontObjects(font, used) {
+    const upm = font.unitsPerEm || 1000;
+    const scale = 1000 / upm;                    // 字体单位 → PDF 千分之一 em
+    const n = v => Math.round(v * scale * 1000) / 1000;
+
+    /* /W 数组：每个用到的 gid 给一个真实 advance，避免等宽导致排版错乱 */
+    const gids = [...used.keys()].sort((a, b) => a - b);
+    let wArr = '';
+    for (const gid of gids) {
+      const w = n(font.widthOf(gid)) || 1000;
+      wArr += gid + ' [' + w + '] ';
+    }
+    if (!wArr) wArr = '0 [1000] ';
+
+    const bbox = [n(font.bbox.xMin), n(font.bbox.yMin), n(font.bbox.xMax), n(font.bbox.yMax)].join(' ');
+    const ascent = n(font.ascender) || 880;
+    const descent = n(font.descender) || -120;
+    /* Flags: bit3(4)=Symbolic 置 0，用 32(Nonsymbolic)+1(FixedPitch? 不置)
+       这里取 4（Symbolic），对 CJK 字体最稳：不依赖 /Encoding 的 Standard 表 */
+    const flags = 4;
+
+    const fontFile2 = font.bytes;
+
+    const cidFont =
+      '<< /Type /Font /Subtype /CIDFontType2 /BaseFont /LingyiCJK' +
+      ' /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>' +
+      ' /FontDescriptor ' + 'FDFONT' + ' 0 R' +
+      ' /DW 1000 /W [' + wArr.trim() + ']' +
+      ' /CIDToGIDMap /Identity >>';
+
+    const type0 =
+      '<< /Type /Font /Subtype /Type0 /BaseFont /LingyiCJK' +
+      ' /Encoding /Identity-H /DescendantFonts [' + 'CIDFONT' + ' 0 R]' +
+      ' /ToUnicode ' + 'TOUNI' + ' 0 R >>';
+
+    const descriptor =
+      '<< /Type /FontDescriptor /FontName /LingyiCJK /Flags ' + flags +
+      ' /FontBBox [' + bbox + '] /ItalicAngle ' + (font.italicAngle || 0) +
+      ' /Ascent ' + ascent + ' /Descent ' + descent +
+      ' /CapHeight ' + ascent + ' /StemV 80' +
+      ' /FontFile2 ' + 'FFILE' + ' 0 R >>';
+
+    const toUni = buildToUnicode(used);
+
+    return {
+      type0: type0, cidFont: cidFont, descriptor: descriptor,
+      toUnicode: toUni, fontFile2: fontFile2, scale: scale
+    };
+  }
+
+  /** 生成 ToUnicode CMap：让译文可以被复制、搜索 */
+  function buildToUnicode(used) {
+    const entries = [...used.entries()].sort((a, b) => a[0] - b[0]);
+    let body = '';
+    /* 每行最多 100 条，保持文件可读且不超长 */
+    for (let i = 0; i < entries.length; i += 100) {
+      const slice = entries.slice(i, i + 100);
+      body += slice.length + ' beginbfchar\n';
+      for (const [gid, cp] of slice) {
+        const src = hex4(gid);
+        let dst;
+        if (cp > 0xffff) {
+          /* 需要代理对 */
+          const v = cp - 0x10000;
+          const hi = 0xd800 + (v >> 10);
+          const lo = 0xdc00 + (v & 0x3ff);
+          dst = hex4(hi) + hex4(lo);
+        } else {
+          dst = hex4(cp);
+        }
+        body += '<' + src + '> <' + dst + '>\n';
+      }
+      body += 'endbfchar\n';
+    }
+    const head = '/CIDInit /ProcSet findresource begin\n' +
+      '12 dict begin\nbegincmap\n' +
+      '/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n' +
+      '/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n' +
+      '1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n';
+    const tail = 'endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n';
+    const text = head + body + tail;
+    /* 编码为字节（Latin1 即可，全是 ASCII） */
+    const bytes = new Uint8Array(text.length);
+    for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i) & 0xff;
+    return bytes;
+  }
+
+  function hex4(n) {
+    return (n & 0xffff).toString(16).toUpperCase().padStart(4, '0');
+  }
+
+  /** 把一段字符串转成 Identity-H 的十六进制串（每个字 2 字节 gid） */
+  function encodeText(font, text, used) {
+    let out = '';
+    for (const ch of String(text || '')) {
+      const cp = ch.codePointAt(0);
+      let gid = font.gidFor(cp);
+      if (!gid) gid = font.gidFor(0x3000);        // 缺字兜底：全角空格
+      if (!gid) gid = 0;
+      if (gid) used.set(gid, cp);
+      out += hex4(gid);
+    }
+    return out;
+  }
+
+  /** 用字体真实 advance 计算文本宽度（PDF 用户单位，即 pt） */
+  function textWidth(font, text, size, used) {
+    let w = 0;
+    for (const ch of String(text || '')) {
+      const cp = ch.codePointAt(0);
+      let gid = font.gidFor(cp);
+      if (!gid) gid = font.gidFor(0x3000) || 0;
+      if (gid && used) used.set(gid, cp);
+      w += font.widthOf(gid) || font.unitsPerEm * 0.5;
+    }
+    return w / font.unitsPerEm * size;
+  }
+
+  root.LingyiPdfFont = {
+    parseTtf: parseTtf,
+    buildFontObjects: buildFontObjects,
+    buildToUnicode: buildToUnicode,
+    encodeText: encodeText,
+    textWidth: textWidth,
+    hex4: hex4
+  };
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
+
+</script>
+<!-- ==================== render-pdf-inplace.js ==================== -->
+<script>
+/* render-pdf-inplace.js — 原版式 + 可选中矢量译文（路线 C）
+ *
+ * 思路（不解析原 PDF，避免 xref/对象流的坑）：
+ *   ① 用 pdf.js 把原 PDF 每页画成图片 → 作为新 PDF 的**整页底图**
+ *      → 版式 100% 保真（图、表、公式、页眉页脚都在原位）
+ *   ② 在每个原文字块上盖一个白色矩形（盖掉原文）
+ *   ③ 在**同一位置**用真正的文字对象写译文，字体内嵌（Identity-H）
+ *      → 译文可选中、可搜索、可复制
+ *
+ * 与"图片型叠加"的区别：译文不是画在像素上，而是 PDF 文字对象，
+ * 所以能选中/搜索；与"结构重建"的区别：完全不做分栏/表格推断。
+ *
+ * 依赖：pdf-font.js（TTF 解析 + PDF 字体对象）、浏览器 canvas、pdf.js
+ */
+(function (root) {
+  'use strict';
+
+  function enc(str) {
+    const s = String(str);
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xff;
+    return out;
+  }
+
+  /**
+   * 用真实字体度量折行（中文按字、西文按词），返回 { lines, width }
+   */
+  function wrapWithFont(F, font, text, size, maxW, used) {
+    const out = [];
+    let line = '';
+    let lineW = 0;
+    const tokens = String(text || '').match(/[\u2e80-\u9fff\u3000-\u303f\uff00-\uffef]|[^\s\u2e80-\u9fff]+|\s+/g) || [];
+    for (const tk of tokens) {
+      const tw = F.textWidth(font, tk, size, used);
+      if (lineW + tw > maxW && line.trim()) {
+        out.push(line.replace(/\s+$/, ''));
+        line = tk.trim() ? tk : '';
+        lineW = tk.trim() ? tw : 0;
+      } else {
+        line += tk;
+        lineW += tw;
+      }
+    }
+    if (line.trim()) out.push(line.replace(/\s+$/, ''));
+    return out.length ? out : [];
+  }
+
+  /**
+   * 生成 PDF。
+   * @param {Object} o
+   * @param {Array}  o.pages  每页：{ width, height, pxW, pxH, jpeg, ops:[...] }
+   *        ops: { kind:'rect', x,y,w,h } | { kind:'text', x,y,size,hex }
+   * @param {Object} o.fontObjs buildFontObjects 的返回值
+   * @param {string} [o.title]
+   */
+  function buildPdf(o) {
+    const pages = o.pages;
+    const fo = o.fontObjs;
+    const chunks = [];
+    let size = 0;
+    const push = (d) => {
+      const b = (d instanceof Uint8Array) ? d : enc(d);
+      chunks.push(b);
+      size += b.length;
+    };
+    const offsets = {};
+    const markObj = (n) => { offsets[n] = size; };
+    const beginObj = (n, dict) => { markObj(n); push(n + ' 0 obj\n' + dict); };
+    const endObj = () => push('\nendobj\n');
+    const streamObj = (n, dict, data) => {
+      beginObj(n, dict.replace('__LEN__', String(data.length)));
+      push('\nstream\n'); push(data); push('\nendstream'); endObj();
+    };
+
+    /* 对象编号
+       1 Catalog, 2 Pages, 3 Info,
+       4 Type0, 5 CIDFont, 6 Descriptor, 7 ToUnicode, 8 FontFile2,
+       之后每页 3 个：Page / Contents / Image */
+    const P0 = 9;
+    const pageObj = i => P0 + i * 3;
+    const contentObj = i => P0 + i * 3 + 1;
+    const imageObj = i => P0 + i * 3 + 2;
+
+    push('%PDF-1.5\n%\xE2\xE3\xCF\xD3\n');
+
+    beginObj(1, '<< /Type /Catalog /Pages 2 0 R >>'); endObj();
+    const kids = pages.map((p, i) => pageObj(i) + ' 0 R').join(' ');
+    beginObj(2, '<< /Type /Pages /Count ' + pages.length + ' /Kids [' + kids + '] >>'); endObj();
+    const title = String(o.title || 'PDF').replace(/[()\\]/g, ' ');
+    beginObj(3, '<< /Title (' + title + ') /Producer (LingYi) >>'); endObj();
+
+    /* --- 字体对象 --- */
+    beginObj(4, fo.type0.replace('CIDFONT', '5').replace('TOUNI', '7')); endObj();
+    beginObj(5, fo.cidFont.replace('FDFONT', '6')); endObj();
+    beginObj(6, fo.descriptor.replace('FFILE', '8')); endObj();
+    streamObj(7, '<< /Length __LEN__ >>', fo.toUnicode);
+    /* FontFile2：/Length1 是**未压缩**字体长度（PDF 规范要求），
+       若用 FlateDecode 压缩，还要加 /Filter。 */
+    const fs = o.fontStream || { data: fo.fontFile2, filter: '' };
+    streamObj(8,
+      '<< /Length __LEN__ /Length1 ' + fo.fontFile2.length + ' ' + (fs.filter || '') + ' >>',
+      fs.data);
+
+    /* --- 每页 --- */
+    pages.forEach((p, i) => {
+      const W = Math.round(p.width), H = Math.round(p.height);
+      beginObj(pageObj(i),
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + W + ' ' + H + ']' +
+        ' /Resources << /XObject << /Im0 ' + imageObj(i) + ' 0 R >>' +
+        ' /Font << /F1 4 0 R >> >>' +
+        ' /Contents ' + contentObj(i) + ' 0 R >>');
+      endObj();
+
+      /* 内容流：先铺底图，再画白底与译文 */
+      let cs = 'q\n' + W + ' 0 0 ' + H + ' 0 0 cm\n/Im0 Do\nQ\n';
+      const rects = [];
+      const texts = [];
+      for (const op of (p.ops || [])) {
+        if (op.kind === 'rect') rects.push(op);
+        else if (op.kind === 'text') texts.push(op);
+      }
+      if (rects.length) {
+        cs += 'q\n1 1 1 rg\n';
+        for (const r of rects) {
+          cs += num(r.x) + ' ' + num(r.y) + ' ' + num(r.w) + ' ' + num(r.h) + ' re\n';
+        }
+        cs += 'f\nQ\n';
+      }
+      if (texts.length) {
+        cs += 'BT\n';
+        let lastSize = null;
+        for (const t of texts) {
+          if (t.size !== lastSize) { cs += '/F1 ' + num(t.size) + ' Tf\n'; lastSize = t.size; }
+          cs += '1 0 0 1 ' + num(t.x) + ' ' + num(t.y) + ' Tm\n<' + t.hex + '> Tj\n';
+        }
+        cs += 'ET\n';
+      }
+      const csBytes = enc(cs);
+      streamObj(contentObj(i), '<< /Length __LEN__ >>', csBytes);
+
+      /* 底图（JPEG 直接 DCTDecode） */
+      streamObj(imageObj(i),
+        '<< /Type /XObject /Subtype /Image /Width ' + p.pxW + ' /Height ' + p.pxH +
+        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length __LEN__ >>',
+        p.jpeg);
+    });
+
+    const total = P0 + pages.length * 3;
+    const xrefPos = size;
+    let xref = 'xref\n0 ' + total + '\n0000000000 65535 f \n';
+    for (let n = 1; n < total; n++) {
+      xref += String(offsets[n] || 0).padStart(10, '0') + ' 00000 n \n';
+    }
+    push(xref);
+    push('trailer\n<< /Size ' + total + ' /Root 1 0 R /Info 3 0 R >>\nstartxref\n' + xrefPos + '\n%%EOF\n');
+
+    const out = new Uint8Array(size);
+    let at = 0;
+    for (const c of chunks) { out.set(c, at); at += c.length; }
+    return out;
+  }
+
+  function num(v) {
+    const n = Number(v);
+    if (!isFinite(n)) return '0';
+    return (Math.round(n * 100) / 100).toString();
+  }
+
+  /**
+   * 用 Deflate 压缩字节（浏览器 CompressionStream）。
+   * 字体 9.3MB 压完通常 5~6MB；不可用时返回 null，调用方退回未压缩。
+   */
+  async function deflate(bytes) {
+    try {
+      if (typeof CompressionStream === 'undefined') return null;
+      const cs = new CompressionStream('deflate');
+      const stream = new Blob([bytes]).stream().pipeThrough(cs);
+      const buf = await new Response(stream).arrayBuffer();
+      return new Uint8Array(buf);
+    } catch (e) { return null; }
+  }
+
+  /**
+   * 主流程：生成"原版式 + 可选中译文"PDF
+   *
+   * @param {Object} o
+   * @param {Uint8Array} o.pdfBytes 原 PDF
+   * @param {Object}   o.pdfjs
+   * @param {Array}    o.pages  [{ number, width, height, blocks:[{x,y,w,h,size,text}] }]
+   * @param {Uint8Array} o.fontBytes 字体文件（用户选择，如 simhei.ttf）
+   * @param {number}   [o.scale=1.6]
+   * @param {number}   [o.quality=0.8]
+   * @param {boolean}  [o.compressFont=true]
+   * @param {Function} [o.onProgress]
+   */
+  async function renderInPlace(o) {
+    const F = root.LingyiPdfFont;
+    if (!F) throw new Error('缺少 pdf-font 模块');
+    const pdfjs = o.pdfjs;
+    if (!pdfjs) throw new Error('缺少 pdf.js');
+    if (!o.fontBytes) throw new Error('缺少字体文件：请选择一个中文字体（如 C:\\Windows\\Fonts\\simhei.ttf）');
+
+    const font = F.parseTtf(o.fontBytes, o.fontFace || 0);
+    const used = new Map();
+    const scale = o.scale || 1.6;
+    const quality = o.quality == null ? 0.8 : o.quality;
+
+    const doc = await pdfjs.getDocument({ data: o.pdfBytes.slice(0) }).promise;
+    const total = doc.numPages;
+    const metaByNum = new Map((o.pages || []).map(p => [p.number, p]));
+    const outPages = [];
+
+    for (let n = 1; n <= total; n++) {
+      const page = await doc.getPage(n);
+      const vp = page.getViewport({ scale: scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(vp.width);
+      canvas.height = Math.ceil(vp.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+      const info = metaByNum.get(n);
+      const pageW = info ? info.width : vp.width / scale;
+      const pageH = info ? info.height : vp.height / scale;
+      const ops = [];
+
+      if (info && info.blocks) {
+        for (const b of info.blocks) {
+          if (!b.text || !String(b.text).trim()) continue;
+          const bw = Math.max(12, b.w || 120);
+          const bh = Math.max(4, b.h || (b.size || 10));
+          /* 白底：盖掉原文（略微外扩，压住抗锯齿边缘）*/
+          ops.push({
+            kind: 'rect',
+            x: b.x - 0.6,
+            y: pageH - (b.y + bh) - 0.6,
+            w: bw + 1.2,
+            h: bh + 1.2
+          });
+          /* 译文：字号自适应，先按原字号试，放不下再缩 */
+          let size = Math.max(1, b.size || 10);
+          let lines = null;
+          for (let attempt = 0; attempt < 7; attempt++) {
+            lines = wrapWithFont(F, font, b.text, size, bw, used);
+            const lh = size * 1.16;
+            if (lines.length * lh <= bh + lh * 0.35) break;
+            /* 放不下：缩字号，但不少于原字号 55% */
+            const next = size * 0.92;
+            if (next < (b.size || 10) * 0.55) { size = next; lines = wrapWithFont(F, font, b.text, size, bw, used); break; }
+            size = next;
+          }
+          const lh = size * 1.16;
+          /* PDF y 轴向上：第一行基线 ≈ 块底 - 下沉量 */
+          let baseline = pageH - b.y - size * 0.92;
+          for (const ln of lines) {
+            if (ln && ln.trim()) {
+              ops.push({
+                kind: 'text',
+                x: b.x,
+                y: baseline,
+                size: size,
+                hex: F.encodeText(font, ln, used)
+              });
+            }
+            baseline -= lh;
+          }
+        }
+      }
+
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+      const bin = atob(b64);
+      const jpeg = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) jpeg[i] = bin.charCodeAt(i);
+
+      outPages.push({
+        width: pageW, height: pageH,
+        pxW: canvas.width, pxH: canvas.height,
+        jpeg: jpeg, ops: ops
+      });
+      if (o.onProgress) o.onProgress(n, total);
+    }
+    if (doc.destroy) { try { doc.destroy(); } catch (e) { } }
+
+    const fontObjs = F.buildFontObjects(font, used);
+    /* 字体流压缩：显著减小体积（9.3MB → 约 5~6MB），失败就退回原始字体 */
+    let fontStream = { data: fontObjs.fontFile2, filter: '' };
+    if (o.compressFont !== false) {
+      const z = await deflate(fontObjs.fontFile2);
+      if (z && z.length < fontObjs.fontFile2.length * 0.95) {
+        fontStream = { data: z, filter: '/Filter /FlateDecode ' };
+      }
+    }
+    const bytes = buildPdf({
+      pages: outPages, fontObjs: fontObjs, title: o.title,
+      fontStream: fontStream
+    });
+    return {
+      bytes: bytes,
+      pageCount: outPages.length,
+      usedGlyphs: used.size,
+      fontBytes: fontStream.data.length,
+      fontRaw: fontObjs.fontFile2.length
+    };
+  }
+
+  root.LingyiPdfInPlace = {
+    renderInPlace: renderInPlace,
+    buildPdf: buildPdf,
+    wrapWithFont: wrapWithFont
+  };
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
 
 </script>
 <!-- ==================== glossary.js ==================== -->
@@ -4603,10 +5510,11 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.5.0';
+  const VERSION = '2.6.0';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
-    'pdf-overlay': 'PDF 叠加（原版式 100% 保真·图片型·译文不可选中）',
+    'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
+    'pdf-overlay': 'PDF 叠加（原版式保真·图片型·不可选中）',
     docx: 'Word（版式最完整·可编辑）',
     pdf: 'PDF（弹出打印，文件名已预填 .pdf）',
     'bilingual-stack': '原文译文对照（上下排列）',
@@ -4614,6 +5522,10 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     html: 'HTML 网页',
     txt: '纯文本'
   };
+  /* 用户选择的中文字体（只在内存里，刷新即失效；不上传、不落盘）*/
+  let fontBytes = null;
+  let fontName = '';
+
   const LS_TERMS = 'lingyi_terms_v1';
   const LS_OPTS = 'lingyi_options_v1';
   const LS_API = 'lingyi_api_url_v1';
@@ -5148,6 +6060,36 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       $('diagStatus').textContent = '已导出可读摘要（' + Math.round(txt.length / 1024) + ' KB）';
       showToast('可读摘要已下载');
     });
+
+    /* ---- 中文字体选择（供「PDF 原位替换」使用）---- */
+    $('fontFile').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const st = $('fontStatus');
+      st.textContent = '正在读取 ' + file.name + ' …';
+      try {
+        const buf = new Uint8Array(await file.arrayBuffer());
+        /* 先用解析器验证一下，避免用户选到 .ttc 或损坏文件后才发现 */
+        const F = window.LingyiPdfFont;
+        if (!F) throw new Error('字体解析模块未加载');
+        const info = F.parseTtf(buf, 0);
+        fontBytes = buf;
+        fontName = file.name;
+        st.innerHTML = '✓ 已载入 <b>' + escapeHtml(file.name) + '</b>（' +
+          (buf.length / 1024 / 1024).toFixed(1) + ' MB，' + info.numGlyphs + ' 个字形）';
+        showToast('字体已就绪，可选用「PDF 原位替换」输出');
+      } catch (err) {
+        fontBytes = null; fontName = '';
+        e.target.value = '';
+        st.textContent = '✗ ' + err.message;
+        showToast(err.message, true);
+      }
+    });
+    $('fontClearBtn').addEventListener('click', () => {
+      fontBytes = null; fontName = '';
+      $('fontFile').value = '';
+      $('fontStatus').textContent = '尚未选择字体';
+    });
   }
 
   /* ==================== 主流程 ==================== */
@@ -5191,18 +6133,27 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
 
     const terms = gloss.parseTerms($('termsText').value);
 
-    /* ---------------- 叠加输出：原 PDF 页面上直接覆盖译文 ----------------
-     * 这条分支不做"PDF→结构重建"，因此不存在分栏/表格猜错的问题：
-     * 原页画成图（版式天然 100% 保真），在原文字位置涂白、写译文。
-     * 译文是像素，不可选中；要可选中请走"原位替换+嵌入字体"路线。 */
-    if (f.outFmt === 'pdf-overlay') {
+    /* -------- 不走"结构重建"的两条 PDF 输出路线（版式零推断）--------
+     *   pdf-inplace：原页做底图 + 白底 + **真文字**译文（内嵌字体）→ 可选中
+     *   pdf-overlay：原页做底图 + 白底 + 画布上的译文（像素）→ 不可选中，但不需要字体
+     * 两者都不猜分栏/表格，所以版式与原 PDF 完全一致。 */
+    if (f.outFmt === 'pdf-overlay' || f.outFmt === 'pdf-inplace') {
+      const isInPlace = (f.outFmt === 'pdf-inplace');
+      const label = isInPlace ? 'PDF 原位替换' : 'PDF 叠加';
       if (f.ext !== 'pdf') {
-        throw new Error('「PDF 叠加」需要 PDF 输入（Word/TXT 请选 Word 输出，能保留真正的版式）');
+        throw new Error('「' + label + '」需要 PDF 输入（Word/TXT 请选 Word 输出，能保留真正的版式）');
       }
       const ov = window.LingyiPdfOverlay;
+      const ip = window.LingyiPdfInPlace;
       if (!ov) throw new Error('叠加渲染模块未加载成功，请刷新页面');
+      if (isInPlace && !ip) throw new Error('原位替换模块未加载成功，请刷新页面');
+      if (isInPlace && !fontBytes) {
+        $('toolsPanel').style.display = 'block';
+        $('fontFile').focus();
+        throw new Error('「原位替换」需要先选择中文字体：打开「⚙️ 术语库…」面板 → 「🔤 中文字体」→ 选择 C:\\Windows\\Fonts\\simhei.ttf');
+      }
       const pages = (ir.pages || []).filter(p => (p.lines || []).length);
-      if (!pages.length) throw new Error('没有解析到页面文字，无法叠加（可能是扫描件）');
+      if (!pages.length) throw new Error('没有解析到页面文字，无法生成（可能是扫描件）');
 
       /* 1) 把每页的行按"同栏、相邻"合并成段落块 */
       const pageBlocks = buildOverlayBlocks(pages);
@@ -5234,26 +6185,44 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       });
       refreshTMStats();
 
-      /* 3) 渲染叠加 PDF */
+      /* 3) 渲染（按所选路线走不同渲染器） */
       f.progress = 85;
-      f.message = `正在渲染 ${pageBlocks.length} 页（原版式保真）…`;
+      f.message = isInPlace
+        ? `正在生成可选中 PDF（${pageBlocks.length} 页，内嵌字体）…`
+        : `正在渲染 ${pageBlocks.length} 页（原版式保真）…`;
       setStage(f);
       const srcBytes = new Uint8Array(await f.file.arrayBuffer());
       const overlayBase = baseName(f.name) + '-灵译-' +
         (f.targetLang === 'zh-CN' ? '中文' : String(f.targetLang).toUpperCase());
-      const rendered = await ov.renderOverlay({
-        pdfBytes: srcBytes,
-        pdfjs: window.pdfjsLib,
-        pages: pageBlocks,
-        title: overlayBase,
-        onProgress: (done, total) => {
-          f.progress = 85 + Math.round(done / Math.max(1, total) * 13);
-          f.message = `渲染第 ${done}/${total} 页…`;
-          setStage(f);
-        }
-      });
+      let rendered;
+      if (isInPlace) {
+        rendered = await ip.renderInPlace({
+          pdfBytes: srcBytes,
+          pdfjs: window.pdfjsLib,
+          pages: pageBlocks,
+          fontBytes: fontBytes,
+          title: overlayBase,
+          onProgress: (done, total) => {
+            f.progress = 85 + Math.round(done / Math.max(1, total) * 13);
+            f.message = `渲染第 ${done}/${total} 页…`;
+            setStage(f);
+          }
+        });
+      } else {
+        rendered = await ov.renderOverlay({
+          pdfBytes: srcBytes,
+          pdfjs: window.pdfjsLib,
+          pages: pageBlocks,
+          title: overlayBase,
+          onProgress: (done, total) => {
+            f.progress = 85 + Math.round(done / Math.max(1, total) * 13);
+            f.message = `渲染第 ${done}/${total} 页…`;
+            setStage(f);
+          }
+        });
+      }
 
-      const fileName = overlayBase + '-叠加.pdf';
+      const fileName = overlayBase + (isInPlace ? '-原位.pdf' : '-叠加.pdf');
       const blob = new Blob([rendered.bytes], { type: 'application/pdf' });
       f.status = 'done'; f.progress = 100; f.message = '完成';
       state.files = state.files.filter(x => x.id !== f.id);
@@ -5261,12 +6230,15 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
         id: f.id, name: f.name, outName: fileName, blob: blob, html: null,
         outFmt: 'docx',                 // 有真实文件，显示"下载"
         diag: f._diag || null,
-        summary: `叠加输出 ${rendered.pageCount} 页 · 成功 ${res.translated} 块 · 版式按原 PDF`
+        summary: (isInPlace ? '原位替换' : '叠加输出') + ` ${rendered.pageCount} 页 · 成功 ${res.translated} 块 · 版式按原 PDF` +
+          (isInPlace ? ` · 用到 ${rendered.usedGlyphs} 个字形 · 字体 ${(rendered.fontBytes / 1024 / 1024).toFixed(1)}MB` : '')
       });
       addRecord(f, fileName);
       renderFiles(); renderCompleted();
       download(blob, fileName);
-      showToast('已生成叠加 PDF（版式与原 PDF 一致，译文不可选中）');
+      showToast(isInPlace
+        ? '已生成可选中 PDF（版式与原 PDF 一致，译文可选中/搜索）'
+        : '已生成叠加 PDF（版式与原 PDF 一致，译文不可选中）');
       return;
     }
 

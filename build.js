@@ -16,7 +16,8 @@ const APP = path.join(ROOT, 'app', 'index.html');
 const SRC = path.join(ROOT, 'src');
 const DIST = path.join(ROOT, 'dist');
 const MODULES = ['core.js', 'layout.js', 'docx-extract.js', 'pdf-extract.js',
-  'render-html.js', 'render-docx.js', 'glossary.js', 'diagnostics.js', 'tm.js', 'translate.js'];
+  'render-html.js', 'render-docx.js', 'render-pdf-overlay.js', 'pdf-font.js',
+  'render-pdf-inplace.js', 'glossary.js', 'diagnostics.js', 'tm.js', 'translate.js'];
 const ASSETS = ['glossary-academic.txt'];
 const OPTIONAL_FILES = ['config.js'];   // 可选部署配置（接口地址），缺失也能运行
 
