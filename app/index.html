@@ -353,7 +353,7 @@
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.6.1';
+  const VERSION = '2.6.2';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -365,9 +365,87 @@
     html: 'HTML 网页',
     txt: '纯文本'
   };
-  /* 用户选择的中文字体（只在内存里，刷新即失效；不上传、不落盘）*/
+  /* 用户选择的中文字体（存在 IndexedDB 里，只选一次；不上传、不落盘到服务器）*/
   let fontBytes = null;
   let fontName = '';
+
+  /* ---- 中文字体持久化（IndexedDB）----
+   * 为什么用 IndexedDB：localStorage 只有 ~5MB，装不下 9MB 的中文字体。
+   * 注意这些函数必须放在模块顶层：processFile 与格式下拉都要调用，
+   * 放在 initTools() 里会变成局部函数，运行时报 "is not defined"。 */
+  const FontStore = {
+    dbName: 'lingyi_font_v1',
+    open() {
+      return new Promise((res, rej) => {
+        if (!window.indexedDB) { rej(new Error('浏览器不支持 IndexedDB')); return; }
+        const r = indexedDB.open(this.dbName, 1);
+        r.onupgradeneeded = () => {
+          if (!r.result.objectStoreNames.contains('font')) r.result.createObjectStore('font');
+        };
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error || new Error('IndexedDB 打开失败'));
+      });
+    },
+    async put(name, bytes) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('font', 'readwrite');
+        tx.objectStore('font').put({ name: name, bytes: bytes }, 'cjk');
+        tx.oncomplete = () => res(true);
+        tx.onerror = () => rej(tx.error);
+      });
+    },
+    async get() {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('font', 'readonly');
+        const q = tx.objectStore('font').get('cjk');
+        q.onsuccess = () => res(q.result || null);
+        q.onerror = () => rej(q.error);
+      });
+    },
+    async del() {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('font', 'readwrite');
+        tx.objectStore('font').delete('cjk');
+        tx.oncomplete = () => res(true);
+        tx.onerror = () => rej(tx.error);
+      });
+    }
+  };
+
+  /** 把字体信息显示到状态行 */
+  function showFontReady(name, len) {
+    const el = document.getElementById('fontStatus');
+    if (!el) return;
+    let glyphs = '';
+    try { glyphs = '，' + window.LingyiPdfFont.parseTtf(fontBytes, 0).numGlyphs + ' 个字形'; } catch (e) { }
+    el.innerHTML = '✓ <b>' + escapeHtml(name) + '</b>（' +
+      (len / 1024 / 1024).toFixed(1) + ' MB' + glyphs + '）已就绪，可重复使用';
+  }
+
+  /** 引导用户去选字体：展开面板 + 滚动过去 + 闪烁提示 */
+  function guideToFontPicker() {
+    const p = document.getElementById('toolsPanel');
+    if (p) p.style.display = 'block';
+    const box = document.getElementById('fontFile');
+    if (!box) return;
+    try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { try { box.scrollIntoView(); } catch (e2) { } }
+    const host = document.getElementById('fontStatus');
+    if (host) {
+      host.innerHTML = '⚠️ <b>请在这里选择中文字体</b>：点下面的「选择文件」，选 <code>C:\\Windows\\Fonts\\simhei.ttf</code>';
+      host.style.color = '#dc2626';
+      host.style.fontWeight = '600';
+      let n = 0;
+      const timer = setInterval(() => {
+        n++;
+        host.style.opacity = (n % 2) ? '0.35' : '1';
+        if (n > 10) { clearInterval(timer); host.style.opacity = '1'; }
+      }, 260);
+    }
+    setTimeout(() => { try { box.focus(); } catch (e) { } }, 400);
+  }
 
   const LS_TERMS = 'lingyi_terms_v1';
   const LS_OPTS = 'lingyi_options_v1';
@@ -804,82 +882,8 @@
       refreshTMStats();
     });
 
-    /* ---- 中文字体持久化（IndexedDB，只选一次）----
-     * localStorage 装不下 9MB 字体，所以用 IndexedDB。
-     * 字体仍然**只存在本机浏览器里**，不上传服务器。 */
-    const FontStore = {
-      dbName: 'lingyi_font_v1',
-      open() {
-        return new Promise((res, rej) => {
-          if (!window.indexedDB) { rej(new Error('浏览器不支持 IndexedDB')); return; }
-          const r = indexedDB.open(this.dbName, 1);
-          r.onupgradeneeded = () => {
-            if (!r.result.objectStoreNames.contains('font')) r.result.createObjectStore('font');
-          };
-          r.onsuccess = () => res(r.result);
-          r.onerror = () => rej(r.error || new Error('IndexedDB 打开失败'));
-        });
-      },
-      async put(name, bytes) {
-        const db = await this.open();
-        return new Promise((res, rej) => {
-          const tx = db.transaction('font', 'readwrite');
-          tx.objectStore('font').put({ name: name, bytes: bytes }, 'cjk');
-          tx.oncomplete = () => res(true);
-          tx.onerror = () => rej(tx.error);
-        });
-      },
-      async get() {
-        const db = await this.open();
-        return new Promise((res, rej) => {
-          const tx = db.transaction('font', 'readonly');
-          const q = tx.objectStore('font').get('cjk');
-          q.onsuccess = () => res(q.result || null);
-          q.onerror = () => rej(q.error);
-        });
-      },
-      async del() {
-        const db = await this.open();
-        return new Promise((res, rej) => {
-          const tx = db.transaction('font', 'readwrite');
-          tx.objectStore('font').delete('cjk');
-          tx.oncomplete = () => res(true);
-          tx.onerror = () => rej(tx.error);
-        });
-      }
-    };
-
-    /** 把字体信息显示到状态行 */
-    function showFontReady(name, len) {
-      const F = window.LingyiPdfFont;
-      let glyphs = '';
-      try { glyphs = '，' + F.parseTtf(fontBytes, 0).numGlyphs + ' 个字形'; } catch (e) { }
-      $('fontStatus').innerHTML = '✓ <b>' + escapeHtml(name) + '</b>（' +
-        (len / 1024 / 1024).toFixed(1) + ' MB' + glyphs + '）已就绪，可重复使用';
-    }
-
-    /** 引导用户去选字体：展开面板 + 滚动过去 + 闪烁提示 */
-    function guideToFontPicker() {
-      const p = $('toolsPanel');
-      p.style.display = 'block';
-      const box = $('fontFile');
-      if (!box) return;
-      try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { box.scrollIntoView(); }
-      /* 用一个明显的呼吸动画把注意力引过去 */
-      const host = $('fontStatus');
-      if (host) {
-        host.innerHTML = '⚠️ <b>请在这里选择中文字体</b>：点下面的「选择文件」，选 <code>C:\\Windows\\Fonts\\simhei.ttf</code>';
-        host.style.color = '#dc2626';
-        host.style.fontWeight = '600';
-        let n = 0;
-        const timer = setInterval(() => {
-          n++;
-          host.style.opacity = (n % 2) ? '0.35' : '1';
-          if (n > 10) { clearInterval(timer); host.style.opacity = '1'; }
-        }, 260);
-      }
-      setTimeout(() => { try { box.focus(); } catch (e) { } }, 400);
-    }
+    /* 中文字体相关的 FontStore / showFontReady / guideToFontPicker
+       已移到模块顶层（见文件前部），因为 processFile 与格式下拉都要用。 */
 
     /* 启动时尝试恢复上次选择的字体 */
     (async function restoreFont() {

@@ -1,0 +1,132 @@
+/* scope-check.js — 静态检查：函数/常量的作用域是否可被调用方看到
+ * 用法: node test/scope-check.js
+ *
+ * 为什么需要它（真实故障）：
+ *   把 guideToFontPicker / FontStore / showFontReady 定义在 initTools() 内部，
+ *   但 processFile 与输出格式下拉在模块顶层调用它们 →
+ *   运行时报 "guideToFontPicker is not defined"，整个翻译失败。
+ *   语法检查查不出来（合法 JS），只有运行时才炸。
+ *
+ * 做法：按缩进判断定义层级。模块顶层（IIFE 内）是 2 空格缩进；
+ * 嵌在函数内部是 ≥4 空格。被顶层代码调用的辅助函数必须在顶层定义。
+ */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+
+const APP = path.join(__dirname, '..', 'app', 'index.html');
+if (!fs.existsSync(APP)) { console.log('缺少 app/index.html'); process.exit(1); }
+const html = fs.readFileSync(APP, 'utf8');
+
+/* 只取 <script> 里的内联 JS（不含 src= 外部引用） */
+const scripts = [];
+const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
+let m;
+while ((m = re.exec(html))) scripts.push(m[1]);
+const js = scripts.join('\n');
+if (!js.trim()) { console.log('没有内联脚本'); process.exit(1); }
+
+let pass = 0, fail = 0;
+const check = (n, c, extra) => {
+  if (c) { console.log('  \u2713 ' + n); pass++; }
+  else { console.log('  \u2717 ' + n + (extra ? '  → ' + extra : '')); fail++; }
+};
+
+/** 收集所有定义：name → [{ indent, line, kind }] */
+function collectDefs(src) {
+  const lines = src.split('\n');
+  const defs = new Map();
+  const add = (name, indent, lineNo, kind) => {
+    if (!defs.has(name)) defs.set(name, []);
+    defs.get(name).push({ indent: indent, line: lineNo, kind: kind });
+  };
+  const reFn = /^(\s*)(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/;
+  const reConst = /^(\s*)(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/;
+  lines.forEach((ln, i) => {
+    let mm = ln.match(reFn);
+    if (mm) { add(mm[2], mm[1].length, i + 1, 'function'); return; }
+    mm = ln.match(reConst);
+    if (mm) add(mm[2], mm[1].length, i + 1, 'var');
+  });
+  return defs;
+}
+
+const defs = collectDefs(js);
+
+/* 被 processFile / 格式下拉 / 顶层流程调用的辅助函数 —— 必须在顶层（缩进 ≤ 2）。
+ * 注意 downloadText 是 initTools() 的内部函数、只在该函数内使用，所以不在列表里。 */
+const MUST_BE_TOP_LEVEL = [
+  'guideToFontPicker', 'FontStore', 'showFontReady',
+  'buildOverlayBlocks', 'baseName', 'download',
+  'addRecord', 'renderFiles', 'renderCompleted', 'setStage',
+  'loadOptions', 'saveOptions', 'getApiUrl', 'escapeHtml',
+  'refreshTMStats', 'processFile', 'initTools', 'openHtmlInNewTab'
+];
+
+console.log('=== 1) 关键辅助函数必须在模块顶层定义 ===');
+MUST_BE_TOP_LEVEL.forEach(name => {
+  const list = defs.get(name);
+  if (!list || !list.length) {
+    /* 有些名字可能用箭头函数赋值，宽松处理：找不到就跳过并记录 */
+    console.log('  · ' + name + '（未按 function/const 声明，跳过）');
+    return;
+  }
+  const topLevel = list.filter(d => d.indent <= 2);
+  const nested = list.filter(d => d.indent > 2);
+  if (nested.length && !topLevel.length) {
+    check(name + ' 在顶层定义', false,
+      '只在缩进 ' + nested.map(d => d.indent).join('/') + ' 处定义（第 ' +
+      nested.map(d => d.line).join(',') + ' 行）→ 顶层调用会报 is not defined');
+  } else {
+    check(name + ' 在顶层定义（缩进 ' + (topLevel[0] ? topLevel[0].indent : '?') + '）', !!topLevel.length);
+  }
+});
+
+console.log('\n=== 2) 不允许"顶层 + 内层"同名（顶层定义会被内层遮蔽）===');
+{
+  /* 只关心真正的风险：某个名字在顶层有定义，同时又在某个函数内部被重新定义。
+     各函数里的 n/p/r/t/f 这类短局部变量是正常的，不算问题。 */
+  const risky = [];
+  for (const [name, list] of defs) {
+    if (name.length <= 2) continue;                  // 短局部变量名，忽略
+    const hasTop = list.some(d => d.indent <= 2);
+    const hasNested = list.some(d => d.indent > 2);
+    if (hasTop && hasNested) {
+      risky.push(name + '(缩进 ' + [...new Set(list.map(d => d.indent))].join('/') + ')');
+    }
+  }
+  console.log('    遮蔽风险: ' + (risky.length ? risky.slice(0, 8).join(', ') : '无'));
+  check('没有"顶层+内层"同名定义', risky.length === 0, risky.join(', '));
+}
+
+console.log('\n=== 3) 字体相关函数必须存在且可见 ===');
+['FontStore', 'showFontReady', 'guideToFontPicker'].forEach(n => {
+  const list = defs.get(n);
+  check(n + ' 已定义', !!list && list.length > 0);
+  if (list && list.length) check(n + ' 缩进 ≤ 2（顶层）', list.every(d => d.indent <= 2),
+    '缩进 ' + list.map(d => d.indent).join('/'));
+});
+
+console.log('\n=== 4) 字体选择控件与 IndexedDB 关键标识都在 ===');
+{
+  check('有 #fontFile 控件', html.indexOf('id="fontFile"') >= 0);
+  check('有 #fontStatus 展示位', html.indexOf('id="fontStatus"') >= 0);
+  check('有 #fontClearBtn', html.indexOf('id="fontClearBtn"') >= 0);
+  check('用了 IndexedDB 库名', js.indexOf('lingyi_font_v1') >= 0);
+  check('选择「原位替换」格式时会引导选字体',
+    /pdf-inplace'\s*&&\s*!fontBytes[\s\S]{0,120}guideToFontPicker/.test(js) ||
+    /guideToFontPicker\(\);[\s\S]{0,80}/.test(js));
+  check('缺少字体时会引导而不是只报错', /!fontBytes\)\s*\{[\s\S]{0,160}guideToFontPicker/.test(js));
+}
+
+console.log('\n=== 5) 每条 PDF 输出路线都能找到自己的渲染器 ===');
+{
+  check('叠加路线引用 LingyiPdfOverlay', js.indexOf('LingyiPdfOverlay') >= 0);
+  check('原位路线引用 LingyiPdfInPlace', js.indexOf('LingyiPdfInPlace') >= 0);
+  check('原地渲染传入了 fontBytes', /renderInPlace\(\{[\s\S]{0,400}fontBytes/.test(js));
+  check('两条路线共用 buildOverlayBlocks', js.indexOf('buildOverlayBlocks') >= 0);
+}
+
+console.log('\n====================================================');
+console.log(`\n结果：通过 ${pass} 项，失败 ${fail} 项`);
+process.exit(fail ? 1 : 0);
