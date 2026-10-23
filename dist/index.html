@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <!--
-  灵译 LingYi · 文档翻译与版式还原引擎  v2.6.2
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.6.3
   © 2026 LingYi. All rights reserved.
   许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
   本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
@@ -1069,15 +1069,21 @@
     /* 【重要】如果这一页本身像表格，就完全不拆。
      * 表格行的单元格之间本来就有大空档（甚至 40~80pt），
      * 拆行会把表格彻底拆散（实测让"表格数量 1 → 0"）。
-     * 判定：至少 2 行、且多数行有 ≥2 个列块、且列块左边界对齐。 */
+     *
+     * 【关键】门槛必须是"每行 ≥3 个列块"，不能是 ≥2：
+     * 「边注栏 + 正文栏」被合并成一行时正好是 **2 个块**，而且第二块的
+     * 起始 x 在多行上完全一致（都落在正文栏起点）。用 ≥2 就会把这种
+     * 跨栏合并行误判成"2 列表格"，于是整页拒绝拆行，正文与版权声明
+     * 继续逐段交替 —— 这就是用户反复看到"排版还是不对"的原因。
+     */
     if (lines && lines.length >= 2) {
-      const multi = lines.filter(l => (l.items || []).length >= 2);
+      const multi = lines.filter(l => (l.items || []).length >= 3);
       if (multi.length >= Math.ceil(lines.length * 0.5)) {
         /* 看这些"多列块"的行，其第二块的起始 x 是否稳定对齐 */
         const starts = [];
         for (const l of multi) {
           const s = (l.items || []).slice().sort((a, b) => a.x0 - b.x0);
-          if (s.length >= 2) starts.push(Math.round(s[1].x0 / 6) * 6);
+          if (s.length >= 3) starts.push(Math.round(s[1].x0 / 6) * 6);
         }
         const freq = {};
         starts.forEach(x => { freq[x] = (freq[x] || 0) + 1; });
@@ -3057,7 +3063,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.6.2 | sha256:4a6e397f9dbaf25f | 2026-10-21 -->
+<!-- build: v2.6.3 | sha256:91d8a515731eb712 | 2026-10-23 -->
 </body></html>`;
   }
 
@@ -5510,7 +5516,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.6.2';
+  const VERSION = '2.6.3';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',

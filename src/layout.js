@@ -279,15 +279,21 @@
     /* 【重要】如果这一页本身像表格，就完全不拆。
      * 表格行的单元格之间本来就有大空档（甚至 40~80pt），
      * 拆行会把表格彻底拆散（实测让"表格数量 1 → 0"）。
-     * 判定：至少 2 行、且多数行有 ≥2 个列块、且列块左边界对齐。 */
+     *
+     * 【关键】门槛必须是"每行 ≥3 个列块"，不能是 ≥2：
+     * 「边注栏 + 正文栏」被合并成一行时正好是 **2 个块**，而且第二块的
+     * 起始 x 在多行上完全一致（都落在正文栏起点）。用 ≥2 就会把这种
+     * 跨栏合并行误判成"2 列表格"，于是整页拒绝拆行，正文与版权声明
+     * 继续逐段交替 —— 这就是用户反复看到"排版还是不对"的原因。
+     */
     if (lines && lines.length >= 2) {
-      const multi = lines.filter(l => (l.items || []).length >= 2);
+      const multi = lines.filter(l => (l.items || []).length >= 3);
       if (multi.length >= Math.ceil(lines.length * 0.5)) {
         /* 看这些"多列块"的行，其第二块的起始 x 是否稳定对齐 */
         const starts = [];
         for (const l of multi) {
           const s = (l.items || []).slice().sort((a, b) => a.x0 - b.x0);
-          if (s.length >= 2) starts.push(Math.round(s[1].x0 / 6) * 6);
+          if (s.length >= 3) starts.push(Math.round(s[1].x0 / 6) * 6);
         }
         const freq = {};
         starts.forEach(x => { freq[x] = (freq[x] || 0) + 1; });

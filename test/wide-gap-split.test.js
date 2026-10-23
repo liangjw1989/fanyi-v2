@@ -167,6 +167,66 @@ console.log('\n=== 5) 整页端到端：拆行后边注与正文分开 ===');
   check('正文区域行数 ≥ 14', !!body && body.lines.length >= 14, body ? String(body.lines.length) : '无');
 }
 
+console.log('\n=== 7) 整页每一行都是"边注+正文"合并（真实故障）===');
+{
+  /* 用户实际文档的情况：不是偶尔一行合并，而是**整页**每行都合并。
+     早期的表格保护把"每行 ≥2 个块且第二块起始一致"判为表格，
+     于是整页被当成"2 列表格" → 完全拒绝拆行 →
+     正文与版权声明继续逐段交替（"排版还是不对"）。
+     修复后门槛是 ≥3 个块，这种 2 块合并行必须被拆开。 */
+  const items = [];
+  for (let i = 0; i < 18; i++) {
+    const y = 100 + i * 13;
+    items.push(item('Licensee MDPI Basel', 35.7, y, 7));
+    items.push(item('the main body text of this systematic review continues here', 166, y, 10));
+  }
+  const raw = L.groupLines(items);
+  console.log('    groupLines → ' + raw.length + ' 行，每行 ' + raw[0].items.length + ' 个块');
+  check('前提：整页被合并成 18 行', raw.length === 18, String(raw.length));
+  check('前提：每行只有 2 个块（像 2 列表格）', raw[0].items.length === 2);
+
+  const contentW = Math.max.apply(null, items.map(i => i.x1)) - Math.min.apply(null, items.map(i => i.x0));
+  const split = L.splitWideGapLines(raw, contentW, undefined);
+  console.log('    拆行后 → ' + split.length + ' 行');
+  check('跨栏合并行被拆开（未被误判为表格）', split.length > raw.length,
+    split.length + ' vs ' + raw.length);
+
+  const regions = L.analyzePage(items, { pageWidth: 595 });
+  console.log('    analyzePage → ' + regions.length + ' 区域: ' +
+    regions.map(r => 'x' + Math.round(r.box.x0) + '~' + Math.round(r.box.x1) + '(' + r.lines.length + '行)').join(' | '));
+  check('切成 2 个区域', regions.length === 2, String(regions.length));
+  const t = l => (l.items || []).map(i => i.str).join('');
+  const mixed = regions.filter(r => {
+    const s = r.lines.map(t).join(' ');
+    return s.indexOf('MDPI') >= 0 && s.indexOf('main body') >= 0;
+  }).length;
+  check('没有区域同时含边注与正文', mixed === 0, mixed + ' 个混排');
+  const body = regions.find(r => r.lines.some(l => t(l).indexOf('main body') >= 0));
+  check('正文 18 行完整在一个区域', !!body && body.lines.length === 18,
+    body ? String(body.lines.length) : '无');
+}
+
+console.log('\n=== 8) 真 3+ 列表格仍然受保护（不被拆）===');
+{
+  /* 门槛提高后不能把表格保护弄失效：4 列的行必须原样保留 */
+  const items = [];
+  const rows = [
+    ['变量', '第一组', '第二组', 'P值'],
+    ['年龄', '32.5', '34.1', '<0.001'],
+    ['BMI', '23.1', '23.6', '0.012'],
+    ['DFI', '18.2', '25.7', '0.003']
+  ];
+  const colx = [60, 170, 280, 390];
+  rows.forEach((row, ri) => row.forEach((c, ci) => items.push(item(c, colx[ci], 300 + ri * 16, 9))));
+  const lines = L.groupLines(items);
+  console.log('    表格行 ' + lines.length + ' 条，每行 ' + lines[0].items.length + ' 个块');
+  const split = L.splitWideGapLines(lines, 520, undefined);
+  console.log('    拆行后 ' + split.length + ' 条');
+  check('4 列表格不被拆开', split.length === lines.length, split.length + ' vs ' + lines.length);
+  const allText = split.map(l => (l.items || []).map(i => i.str).join('')).join('');
+  check('表格内容完整', allText.indexOf('变量') >= 0 && allText.indexOf('DFI') >= 0 && allText.indexOf('0.003') >= 0);
+}
+
 console.log('\n====================================================');
 console.log(`\n结果：通过 ${pass} 项，失败 ${fail} 项`);
 process.exit(fail ? 1 : 0);
