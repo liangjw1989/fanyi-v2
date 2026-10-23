@@ -117,7 +117,9 @@
     .btn-primary:hover:not(:disabled) { background:linear-gradient(135deg,#3b54d4,#6a4be0); }
     .btn-outline { background:white; border:1.5px solid var(--border); color:#334155; }
     .btn-outline:hover { background:#f8fafc; border-color:var(--primary); }
-    .btn-danger { background:#ef4444; color:white; }
+    .btn-warn { background:#f59e0b; color:#fff; border:1px solid #f59e0b; }
+  .btn-warn:hover { background:#d97706; }
+  .btn-danger { background:#ef4444; color:white; }
     .btn-sm { padding:0.3rem 0.8rem; font-size:0.75rem; }
     .tabs { display:flex; gap:0.3rem; margin-bottom:1.5rem; background:#e2e8f0; padding:0.3rem; border-radius:2rem; width:fit-content; }
     .tab-btn { border:none; background:transparent; color:#64748b; padding:0.6rem 1.8rem; border-radius:1.8rem; font-weight:600; cursor:pointer; transition:all 0.3s ease; font-size:0.9rem; }
@@ -380,7 +382,7 @@
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.6.4';
+  const VERSION = '2.6.5';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -636,6 +638,11 @@
           <select class="fmt-select" data-id="${f.id}">
             ${Object.keys(OUT_FMT).map(k => `<option value="${k}" ${f.outFmt === k ? 'selected' : ''}>输出：${OUT_FMT[k]}</option>`).join('')}
           </select>
+          ${f.outFmt === 'pdf-inplace' ? `
+            <button class="btn ${fontBytes ? 'btn-outline' : 'btn-warn'} btn-sm pick-font-btn" data-id="${f.id}"
+              title="「PDF 原位替换」需要把译文写成真正的文字，因此必须内嵌一份中文字体">
+              ${fontBytes ? '🔤 字体已就绪' : '⚠️ 选择中文字体'}
+            </button>` : ''}
           <button class="btn btn-primary btn-sm process-btn" data-id="${f.id}" ${f.status === 'running' ? 'disabled' : ''}>▶ 翻译</button>
           <button class="btn btn-danger btn-sm delete-btn" data-id="${f.id}">🗑</button>
         </div>
@@ -660,10 +667,11 @@
     if (e.target.classList.contains('engine-select')) f.engine = e.target.value;
     if (e.target.classList.contains('fmt-select')) {
       f.outFmt = e.target.value;
-      /* 选了「PDF 原位替换」但还没选字体时，立刻引导去选 —— 不要等点翻译才报错 */
+      renderFiles();        // 立刻刷新：pdf-inplace 会多出「选择中文字体」按钮
+      /* 选了「PDF 原位替换」但还没选字体时，直接弹文件选择框 —— 少一次点击 */
       if (f.outFmt === 'pdf-inplace' && !fontBytes) {
-        showToast('该输出需要中文字体，已为你打开字体设置', true);
-        guideToFontPicker();
+        showToast('该输出需要中文字体：请选 C:\\Windows\\Fonts\\simhei.ttf', true);
+        try { $('fontFile').click(); } catch (err) { guideToFontPicker(); }
       }
     }
   });
@@ -672,6 +680,15 @@
     const f = state.files.find(x => x.id === id);
     if (!f) return;
     if (e.target.classList.contains('delete-btn')) { state.files = state.files.filter(x => x.id !== id); renderFiles(); return; }
+    /* 行内的「选择中文字体」按钮：直接打开文件选择框 */
+    if (e.target.classList.contains('pick-font-btn')) {
+      if (fontBytes) {
+        /* 已就绪：告知状态，仍允许换一个 */
+        showToast('字体已就绪（' + fontName + '）；如需更换请重新选择');
+      }
+      try { $('fontFile').click(); } catch (err) { guideToFontPicker(); }
+      return;
+    }
     if (e.target.classList.contains('process-btn')) {
       e.target.disabled = true;
       try { await processFile(f); } catch (err) { console.error(err); f.status = 'error'; f.message = '失败：' + err.message; setStage(f); showToast('翻译失败：' + err.message, true); }
@@ -923,6 +940,7 @@
         window.LingyiPdfFont.parseTtf(fontBytes, 0);
         showFontReady(fontName, fontBytes.length);
         $('fontStatus').style.color = '#16a34a';
+        renderFiles();
       } catch (e) {
         /* 恢复失败就静默忽略，用户可以重新选 */
         fontBytes = null; fontName = '';
@@ -1054,6 +1072,7 @@
         fontName = file.name;
         st.style.color = '#16a34a';
         showFontReady(file.name, buf.length);
+        renderFiles();        // 行内按钮从「⚠️ 选择中文字体」变成「🔤 字体已就绪」
         showToast('字体已就绪，之后会自动记住，不用再选');
         /* 存进 IndexedDB，下次刷新仍然可用 */
         try { await FontStore.put(file.name, buf); }
@@ -1133,7 +1152,7 @@
       if (isInPlace && !ip) throw new Error('原位替换模块未加载成功，请刷新页面');
       if (isInPlace && !fontBytes) {
         guideToFontPicker();          // 展开面板 + 滚动到控件 + 闪烁提示
-        throw new Error('「原位替换」需要中文字体：已为你展开面板，请点「选择文件」选 C:\\Windows\\Fonts\\simhei.ttf（只需选一次，之后会自动记住）');
+        throw new Error('「原位替换」需要中文字体：点该文件那一行的「⚠️ 选择中文字体」按钮，选 C:\\Windows\\Fonts\\simhei.ttf（只需选一次）');
       }
       const pages = (ir.pages || []).filter(p => (p.lines || []).length);
       if (!pages.length) throw new Error('没有解析到页面文字，无法生成（可能是扫描件）');

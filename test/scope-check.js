@@ -162,6 +162,22 @@ console.log('\n=== 6) 第三方库加载方式（禁止 document.write）===');
   check('vendor 引用无重复', vendorRefs === uniq.size, vendorRefs + ' vs ' + uniq.size);
 }
 
+console.log('\n=== 7) 字体选择入口必须"在操作行内"且事件已绑定 ===');
+{
+  /* 真实故障：字体控件藏在折叠面板深处，用户点了翻译才看到报错，
+     报错里让他"打开面板找控件"，他找不到 → 反复失败。
+     修法：文件那一行直接显示「⚠️ 选择中文字体」按钮。 */
+  check('文件行模板里有 pick-font-btn 按钮', js.indexOf('pick-font-btn') >= 0);
+  check('按钮只在 pdf-inplace 输出时出现', /pdf-inplace'\s*\?\s*`/.test(js) || /outFmt === 'pdf-inplace' \? `/.test(js));
+  check('点击事件已绑定 pick-font-btn', /classList\.contains\('pick-font-btn'\)/.test(js));
+  check('点击后打开文件选择框', /pick-font-btn'\)\)[\s\S]{0,300}\$\('fontFile'\)\.click\(\)/.test(js) ||
+    /classList\.contains\('pick-font-btn'\)[\s\S]{0,400}fontFile'\)\.click\(\)/.test(js));
+  check('选择格式后立刻刷新列表（让按钮出现）', /fmt-select'\)\)[\s\S]{0,200}renderFiles\(\)/.test(js));
+  check('字体载入后刷新列表（按钮变"已就绪"）', /showFontReady\([\s\S]{0,160}renderFiles\(\)/.test(js));
+  check('有 btn-warn 警示样式', html.indexOf('btn-warn') >= 0);
+  check('报错文案指向行内按钮', js.indexOf('选择中文字体」按钮') >= 0 || js.indexOf('该文件那一行') >= 0);
+}
+
 console.log('\n====================================================');
 console.log(`\n结果：通过 ${pass} 项，失败 ${fail} 项`);
 process.exit(fail ? 1 : 0);
