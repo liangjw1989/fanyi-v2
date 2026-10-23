@@ -127,6 +127,41 @@ console.log('\n=== 5) 每条 PDF 输出路线都能找到自己的渲染器 ==='
   check('两条路线共用 buildOverlayBlocks', js.indexOf('buildOverlayBlocks') >= 0);
 }
 
+console.log('\n=== 6) 第三方库加载方式（禁止 document.write）===');
+{
+  /* 真实故障：Chrome 控制台报
+       "A parser-blocking, cross site script ... is invoked via document.write.
+        The network request for this script MAY be blocked by the browser"
+     用 document.write 注入跨站脚本会被判定为 parser-blocking，未来可能被拦。
+     必须改成按需异步加载；本地 vendor/ 有文件时根本不该走 CDN。 */
+  /* 只查"往当前文档注入 <script>"这种真正会被浏览器拦的写法。
+     `w.document.write(html)` 往打印用的新窗口写内容属于正当用法，不算问题；
+     注释里提到 document.write 也不该报。所以先把注释剥掉，再匹配
+     document.write 后面紧跟 <script。 */
+  const jsNoComment = js
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')      // 块注释
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');  // 行注释（避免误伤 http://）
+  const htmlNoComment = html
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const badWrite = (jsNoComment + '\n' + htmlNoComment)
+    .match(/document\.write\s*\(\s*['"`]?\s*<script/gi);
+  check('没有用 document.write 注入 <script>（跨站脚本）', !badWrite,
+    badWrite ? badWrite.length + ' 处' : '');
+  check('提供了 ensureLib 异步加载器', js.indexOf('window.ensureLib') >= 0);
+  check('有 CDN 兜底地址表', js.indexOf('__LINGYI_CDN') >= 0);
+
+  ['pdfjsLib', 'mammoth', 'docx', 'Tesseract'].forEach(n => {
+    if (js.indexOf('window.' + n) < 0) return;      // 该库未被使用就跳过
+    check(n + ' 使用前有 ensureLib 保护', js.indexOf("ensureLib('" + n + "')") >= 0);
+  });
+
+  const vendorRefs = (html.match(/src="\.\/vendor\//g) || []).length;
+  const uniq = new Set((html.match(/src="\.\/vendor\/[^"]+"/g) || []));
+  console.log('    vendor 引用: ' + vendorRefs + ' 条，去重后 ' + uniq.size + ' 条');
+  check('vendor 引用无重复', vendorRefs === uniq.size, vendorRefs + ' vs ' + uniq.size);
+}
+
 console.log('\n====================================================');
 console.log(`\n结果：通过 ${pass} 项，失败 ${fail} 项`);
 process.exit(fail ? 1 : 0);

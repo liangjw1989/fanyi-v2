@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <!--
-  灵译 LingYi · 文档翻译与版式还原引擎  v2.6.3
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.6.4
   © 2026 LingYi. All rights reserved.
   许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
   本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
@@ -15,24 +15,51 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-  <!-- 第三方库（需联网加载；本地 vendor/ 目录存在时优先用本地） -->
+  <!-- 第三方库：优先用本地 vendor/（离线可用、无跨站警告）。
+       本地缺失时**不再使用 document.write** —— 浏览器会把它判定为
+       "parser-blocking 跨站脚本"（Chrome 已警告，未来可能直接拦截）。
+       改为按需异步加载，见下方 window.ensureLib()。 -->
   <script src="./vendor/qrcode.min.js" onerror="this.remove()"></script>
-  <script>window.QRCode || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>');</script>
-
   <script src="./vendor/pdf.min.js" onerror="this.remove()"></script>
-  <script>window.pdfjsLib || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');</script>
-
   <script src="./vendor/mammoth.browser.min.js" onerror="this.remove()"></script>
-  <script>window.mammoth || document.write('<script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"><\/script>');</script>
-
   <script src="./vendor/docx.umd.js" onerror="this.remove()"></script>
-  <script>window.docx || document.write('<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"><\/script>');</script>
-
-  <script src="./vendor/marked.min.js" onerror="this.remove()"></script>
-  <script>window.marked || document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');</script>
-
   <script src="./vendor/tesseract.min.js" onerror="this.remove()"></script>
-  <script>window.Tesseract || document.write('<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"><\/script>');</script>
+  <script>
+    /* 各库的 CDN 兜底地址（仅在本地 vendor 缺失时才用） */
+    window.__LINGYI_CDN = {
+      QRCode: 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+      pdfjsLib: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+      mammoth: 'https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js',
+      docx: 'https://unpkg.com/docx@8.5.0/build/index.umd.js',
+      Tesseract: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'
+    };
+    /**
+     * 确保某个库可用：本地已有则立刻返回；否则异步注入 CDN 脚本。
+     * 相比 document.write 的好处：不阻塞解析、不触发浏览器警告、按需才下载。
+     */
+    window.ensureLib = function (name) {
+      if (window[name]) return Promise.resolve(window[name]);
+      const url = window.__LINGYI_CDN[name];
+      if (!url) return Promise.reject(new Error('未知的库：' + name));
+      if (!window.__lingyiLoading) window.__lingyiLoading = {};
+      if (window.__lingyiLoading[name]) return window.__lingyiLoading[name];
+      window.__lingyiLoading[name] = new Promise(function (resolve, reject) {
+        const s = document.createElement('script');
+        s.src = url;
+        s.async = true;
+        s.onload = function () {
+          if (window[name]) resolve(window[name]);
+          else reject(new Error(name + ' 脚本已加载但未注册全局变量'));
+        };
+        s.onerror = function () {
+          delete window.__lingyiLoading[name];
+          reject(new Error(name + ' 加载失败：请检查网络，或把该库放到 vendor/ 目录以离线使用'));
+        };
+        document.head.appendChild(s);
+      });
+      return window.__lingyiLoading[name];
+    };
+  </script>
 
   <style>
     /* ==================== CSS 变量定义 ==================== */
@@ -3063,7 +3090,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.6.3 | sha256:91d8a515731eb712 | 2026-10-23 -->
+<!-- build: v2.6.4 | sha256:cd70605b0e226c89 | 2026-10-23 -->
 </body></html>`;
   }
 
@@ -5516,7 +5543,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.6.3';
+  const VERSION = '2.6.4';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -5890,7 +5917,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     const ext = f.ext;
     if (ext === 'docx') {
       onStage('解析 Word 结构…');
-      if (!window.mammoth) throw new Error('mammoth 库未加载成功，请检查网络后刷新页面');
+      await window.ensureLib('mammoth');
       const buf = await f.file.arrayBuffer();
       const ir = await dx.extractDocx(buf, { mammoth: window.mammoth, fileName: f.name });
       ir.meta.fileName = f.name;
@@ -5898,7 +5925,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     }
     if (ext === 'pdf') {
       onStage('解析 PDF 版式（分栏/段落/表格）…');
-      if (!window.pdfjsLib) throw new Error('pdf.js 未加载成功，请检查网络后刷新页面');
+      await window.ensureLib('pdfjsLib');
       const ir = await px.extractPDF(f.file, {
         pdfjs: window.pdfjsLib,
         fileName: f.name,
@@ -5943,7 +5970,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     }
     if (['png', 'jpg', 'jpeg'].includes(ext)) {
       onStage('OCR 识别图片文字…');
-      if (!window.Tesseract) throw new Error('OCR 组件未加载成功，请检查网络后刷新页面');
+      await window.ensureLib('Tesseract');
       const worker = await window.Tesseract.createWorker('chi_sim+eng', 1);
       const { data: { text } } = await worker.recognize(f.file);
       await worker.terminate();
@@ -6389,7 +6416,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     let blob, outName, html = null;
 
     if (f.outFmt === 'docx') {
-      if (!window.docx) throw new Error('docx 库未加载成功，请检查网络后刷新页面');
+      await window.ensureLib('docx');
       const r = await rd.renderDocx(ir, Object.assign({ docx: window.docx, fileName: outBase }, opts));
       blob = r.blob; outName = r.filename;
       html = rh.renderDocument(ir, opts);
