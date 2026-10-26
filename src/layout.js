@@ -341,6 +341,45 @@
     return out;
   }
 
+  /**
+   * 按「行宽」切出窄边注栏 —— 比"按行首 x 聚类"可靠得多。
+   *
+   * 为什么换判据：期刊页面的行首 x 有十几档（缩进、表格列、居中标题…），
+   * 用 20pt 容差聚类会把正文拆成好几簇，"哪一簇是正文"就不稳定
+   * （实测同一份 PDF 第 1 页能切、第 3/4 页切不开）。
+   *
+   * 新判据（几何上很硬，不需要调阈值）：
+   *   1. 正文左边界 = **宽行**（宽度 ≥ 内容宽 35%）行首 x 的中位数
+   *      —— 宽行一定是正文，边注栏不可能宽
+   *   2. 边注行 = 整行都落在 `正文左边界 - 2pt` 之左的行（不重叠是硬条件）
+   *   3. 边注行数 ≥ 4，且至少一条明显靠左（否则像正文末行而不是独立栏）
+   *
+   * @returns {Array|null} [边注行, 其余行]
+   */
+  function splitMarginalByWidth(lines, contentW, opts) {
+    if (!lines || lines.length < 8) return null;
+    const minMarg = (opts && opts.minMarginalLines) || 4;
+    const wideThreshold = contentW * 0.35;
+
+    const wideLines = lines.filter(l => (l.x1 - l.x0) >= wideThreshold);
+    if (wideLines.length < 3) return null;
+    const xs = wideLines.map(l => l.x0).sort((a, b) => a - b);
+    const bodyLeft = xs[Math.floor(xs.length / 2)];
+    if (!(bodyLeft > 0)) return null;
+
+    const margLines = lines.filter(l => l.x1 <= bodyLeft - 2);
+    if (margLines.length < minMarg) return null;
+
+    const mMinX0 = Math.min.apply(null, margLines.map(l => l.x0));
+    if (mMinX0 > bodyLeft - 24) return null;
+
+    const rest = lines.filter(l => l.x1 > bodyLeft - 2);
+    if (!rest.length) return null;
+
+    const byY = (a, b) => (a.y0 - b.y0) || (a.x0 - b.x0);
+    return [margLines.slice().sort(byY), rest.slice().sort(byY)];
+  }
+
   function analyzePage(items, opts) {
     opts = opts || {};
     if (!items.length) return [];
@@ -366,13 +405,13 @@
     // 在"片段级"找竖直走廊：分栏排版里，中缝上横跨的片段极少（通常只有通栏标题/公式）。
     /* 先试"窄边注栏切分"：对 MDPI 这类「宽正文 + 窄左边注」最可靠。
      *
-     * 为什么要在走廊之前：实测该论文能找到一条（错误的）走廊位于正文内部
-     * （x≈404），于是走廊分支先命中，边注/正文的切分逻辑永远不执行，
-     * 结果整页还是 1 个区域、正文与版权声明逐段交替。
-     * 这里的判据很保守（边注 ≥3 行、P75 分离、主体行数 ≥ 边注 1.2 倍），
-     * 平衡双栏（行数接近）不会命中，因此不会误伤。
-     */
-    const marginal = splitMarginalColumn(initialLines, opts);
+     * 为什么要在走廊之前：实测该论文能找到一个（错误的）走廊位于正文内部
+     * （x≈404），走廊分支先命中后边注切分永远不执行，整页仍是 1 个区域、
+     * 正文与版权声明逐段交替。
+     *
+     * 优先用「按行宽」判据（几何硬条件），失败再退回「按行首 x 聚类」。 */
+    let marginal = splitMarginalByWidth(initialLines, contentW, opts);
+    if (!marginal) marginal = splitMarginalColumn(initialLines, opts);
     if (marginal && marginal[0].length && marginal[1].length) {
       return [mkLineRegion(marginal[0], 0, false), mkLineRegion(marginal[1], 0, false)];
     }
@@ -479,7 +518,41 @@
       prevY = l.y0;
     }
     if (run.length) out.push(mkLineRegion(run, 0, true));
-    return out.length ? out : [mkLineRegion(initialLines, 0)];
+    return out.length ? coalesceRegions(out, initialLines) : [mkLineRegion(initialLines, 0)];
+  }
+
+  /**
+   * 合并"碎片区域"：把只有 1~2 行的区域并进它在垂直方向上最近的邻居。
+   *
+   * 为什么需要：走廊分支有时会把一页切成 5~7 个区域，其中若干只含一两行
+   * （实测第 2 页：9/4/12/8/1/1/1 行）。这些碎片会**切断段落**，
+   * 让输出出现大量一段一句话的碎块。
+   */
+  function coalesceRegions(regions, initialLines) {
+    if (!regions || regions.length <= 2) return regions;
+    const small = regions.filter(r => (r.lines || []).length <= 2);
+    if (!small.length) return regions;
+
+    const big = regions.filter(r => (r.lines || []).length > 2)
+      .slice().sort((a, b) => a.box.y0 - b.box.y0);
+    if (!big.length) return [mkLineRegion(initialLines, 0)];
+
+    /* 每个碎片的行按 y 就近并入某个大区域 */
+    for (const s of small) {
+      const cy = (s.box.y0 + s.box.y1) / 2;
+      let target = big[0];
+      let best = Infinity;
+      for (const b of big) {
+        const d = Math.min(Math.abs(cy - b.box.y0), Math.abs(cy - b.box.y1));
+        if (d < best) { best = d; target = b; }
+      }
+      target.lines = (target.lines || []).concat(s.lines || []);
+    }
+    /* 并入后按 y 重排，并重建区域（box/items 要跟着更新） */
+    return big.map(b => {
+      const ls = (b.lines || []).slice().sort((x, y) => x.y0 - y.y0);
+      return mkLineRegion(ls, 0, !!b.spanning);
+    });
   }
 
   /**
@@ -679,7 +752,7 @@
 
   return {
     EPS, width, height, centerX, centerY, unionBox, overlap1d, crossingCount,
-    groupLines, lineMaxGap, lineGaps, findVerticalGutters, findColumnCorridor, splitMarginalColumn, splitWideGapLines, percentile,
+    groupLines, lineMaxGap, lineGaps, findVerticalGutters, findColumnCorridor, splitMarginalColumn, splitMarginalByWidth, splitWideGapLines, percentile,
     analyzePage, analyzeLines, mkLineRegion, regionize, orderRegionsByFlow,
     detectTable
   };
