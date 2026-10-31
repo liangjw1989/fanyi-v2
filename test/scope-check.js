@@ -178,6 +178,24 @@ console.log('\n=== 7) 字体选择入口必须"在操作行内"且事件已绑�
   check('报错文案指向行内按钮', js.indexOf('选择中文字体」按钮') >= 0 || js.indexOf('该文件那一行') >= 0);
 }
 
+console.log('\n=== 8) 字体获取要"不依赖用户在文件对话框里找文件" ===');
+{
+  /* 真实故障：Windows 文件对话框隐藏字体扩展名（显示 simhei 而非 simhei.ttf），
+     用户按提示输入完整路径也找不到 → 反复失败。
+     修法：① 提供「用系统字体」按钮（Local Font Access API），完全不找文件；
+           ② 支持 .ttc（微软雅黑 msyh.ttc 一定存在）；
+           ③ 支持把字体文件拖进来。 */
+  check('有「用系统字体」按钮', html.indexOf('id="pickSystemFontBtn"') >= 0);
+  check('调用 Local Font Access API', js.indexOf('queryLocalFonts') >= 0);
+  check('有该按钮的点击处理', /pickSystemFontBtn'\)\.addEventListener/.test(js));
+  check('读取到 blob 后写入 fontBytes', /queryLocalFonts[\s\S]{0,2000}fontBytes\s*=/.test(js));
+  check('文件选择支持 .ttc', /accept="\.ttf,\.otf,\.ttc"/.test(html));
+  check('支持拖拽字体文件', js.indexOf('setupFontDrop') >= 0);
+  check('提示说明了"扩展名被隐藏"这个坑', js.indexOf('隐藏字体扩展名') >= 0 || html.indexOf('隐藏字体扩展名') >= 0);
+  check('推荐 msyh.ttc 作为备选', html.indexOf('msyh.ttc') >= 0 || js.indexOf('msyh.ttc') >= 0);
+  check('不支持该 API 时有明确提示', js.indexOf('不支持「用系统字体」') >= 0);
+}
+
 console.log('\n====================================================');
 console.log(`\n结果：通过 ${pass} 项，失败 ${fail} 项`);
 process.exit(fail ? 1 : 0);

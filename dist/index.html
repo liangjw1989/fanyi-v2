@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <!--
-  灵译 LingYi · 文档翻译与版式还原引擎  v2.7.0
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.7.1
   © 2026 LingYi. All rights reserved.
   许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
   本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
@@ -254,11 +254,15 @@
            字体只在你本机使用、不上传，所以没有版权与网络问题。 -->
       <div style="font-weight:600; margin-bottom:0.4rem;">🔤 中文字体（用于「PDF 原位替换·可选中」）</div>
       <div style="font-size:0.75rem; color:#94a3b8; line-height:1.6; margin-bottom:0.5rem;">
-        选一个<b>单一 .ttf</b> 中文字体即可（不要 .ttc 集合）。Windows 可用
-        <code>C:\Windows\Fonts\simhei.ttf</code>。<b>字体只在本机使用，不会上传</b>。
+        最省事：点下面 <b>「🔍 用系统字体」</b>，自动挑一份中文字体，<b>不用找文件</b>。<br>
+        也可以手动选文件：Windows 文件对话框会<b>隐藏字体扩展名</b>，你会看到 <code>simhei</code>
+        而不是 <code>simhei.ttf</code>，直接在文件名框输入 <code>simhei</code> 回车即可；
+        也可以选 <code>msyh.ttc</code>（微软雅黑，支持 .ttc）、<code>Deng.ttf</code>、<code>simfang.ttf</code>。<br>
+        <b>字体只在本机使用，不会上传。</b>
       </div>
       <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-bottom:0.5rem;">
-        <input type="file" id="fontFile" accept=".ttf,.otf" style="font-size:0.78rem;">
+        <button class="btn btn-primary btn-sm" id="pickSystemFontBtn">🔍 用系统字体（推荐）</button>
+        <input type="file" id="fontFile" accept=".ttf,.otf,.ttc" style="font-size:0.78rem; max-width:230px;">
         <button class="btn btn-outline btn-sm" id="fontClearBtn">清除</button>
       </div>
       <div id="fontStatus" style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.6rem;">
@@ -3165,7 +3169,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.7.0 | sha256:e12fe5057c372757 | 2026-10-26 -->
+<!-- build: v2.7.1 | sha256:e52dd9649b4b764f | 2026-10-31 -->
 </body></html>`;
   }
 
@@ -5618,7 +5622,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.7.0';
+  const VERSION = '2.7.1';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -5877,7 +5881,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
           ${f.outFmt === 'pdf-inplace' ? `
             <button class="btn ${fontBytes ? 'btn-outline' : 'btn-warn'} btn-sm pick-font-btn" data-id="${f.id}"
               title="「PDF 原位替换」需要把译文写成真正的文字，因此必须内嵌一份中文字体">
-              ${fontBytes ? '🔤 字体已就绪' : '⚠️ 选择中文字体'}
+              ${fontBytes ? '🔤 字体已就绪' : '⚠️ 选字体'}
             </button>` : ''}
           <button class="btn btn-primary btn-sm process-btn" data-id="${f.id}" ${f.status === 'running' ? 'disabled' : ''}>▶ 翻译</button>
           <button class="btn btn-danger btn-sm delete-btn" data-id="${f.id}">🗑</button>
@@ -5906,7 +5910,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       renderFiles();        // 立刻刷新：pdf-inplace 会多出「选择中文字体」按钮
       /* 选了「PDF 原位替换」但还没选字体时，直接弹文件选择框 —— 少一次点击 */
       if (f.outFmt === 'pdf-inplace' && !fontBytes) {
-        showToast('该输出需要中文字体：请选 C:\\Windows\\Fonts\\simhei.ttf', true);
+        showToast('该输出需要中文字体：点「⚠️ 选字体」自动用系统字体', true);
         try { $('fontFile').click(); } catch (err) { guideToFontPicker(); }
       }
     }
@@ -6329,6 +6333,98 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       st.textContent = '尚未选择字体';
       try { await FontStore.del(); } catch (e) { }
     });
+
+    /* ---- 「🔍 用系统字体」：完全不用找文件 ----
+     * 用 Local Font Access API（Chrome/Edge 103+）直接向浏览器要系统字体
+     * 的原始字节：FontData.blob() 返回的就是字体文件内容。
+     * 这样用户不必在文件对话框里翻 C:\Windows\Fonts，
+     * 也避开了"Windows 隐藏字体扩展名 → 以为找不到文件"的坑。 */
+    $('pickSystemFontBtn').addEventListener('click', async () => {
+      const st = $('fontStatus');
+      if (!navigator.queryLocalFonts) {
+        st.style.color = '#dc2626';
+        st.textContent = '✗ 当前浏览器不支持「用系统字体」（需 Chrome/Edge 103+）。请改用右侧「选择文件」。';
+        showToast('该浏览器不支持读取系统字体，请用「选择文件」', true);
+        return;
+      }
+      st.style.color = '#94a3b8';
+      st.textContent = '正在读取系统字体列表…（浏览器会弹出授权提示，请点「允许」）';
+      try {
+        const fonts = await navigator.queryLocalFonts();
+        if (!fonts || !fonts.length) throw new Error('没有读到系统字体');
+        /* 优先挑常见中文字体（按优先级） */
+        const PRIORITY = [
+          /simhei|黑体/i, /msyh|microsoft\s*yahei|微软雅黑/i, /simsun|宋体/i,
+          /dengxian|等线/i, /simkai|楷体/i, /simfang|仿宋/i,
+          /source\s*han|noto\s*sans\s*(sc|cjk)|思源/i, /pingfang|苹方/i, /heiti|hei/i
+        ];
+        let pick = null;
+        for (const re of PRIORITY) {
+          pick = fonts.find(ft => re.test(ft.fullName || '') || re.test(ft.family || '') || re.test(ft.postscriptName || ''));
+          if (pick) break;
+        }
+        /* 再退一步：任何 font-family 里带 CJK 线索的 */
+        if (!pick) {
+          pick = fonts.find(ft => /cjk|sc\b|chinese|han/i.test(ft.family || ''));
+        }
+        if (!pick) {
+          /* 实在没有：把前若干个字体名字列出来让用户自己挑 */
+          const names = [...new Set(fonts.map(ft => ft.family))].slice(0, 200);
+          throw new Error('没自动识别到中文字体。系统里有 ' + names.length +
+            ' 个字族，例如：' + names.slice(0, 8).join(' / ') + '。请改用「选择文件」');
+        }
+        st.textContent = '正在读取字体数据：' + (pick.fullName || pick.family) + ' …';
+        const blob = await pick.blob();
+        const buf = new Uint8Array(await blob.arrayBuffer());
+        const F = window.LingyiPdfFont;
+        F.parseTtf(buf, 0);                  // 校验
+        fontBytes = buf;
+        fontName = (pick.fullName || pick.family) + '（系统字体）';
+        st.style.color = '#16a34a';
+        showFontReady(fontName, buf.length);
+        renderFiles();
+        try { await FontStore.put(fontName, buf); } catch (e) { }
+        showToast('已用系统字体：' + (pick.fullName || pick.family));
+      } catch (err) {
+        st.style.color = '#dc2626';
+        st.textContent = '✗ ' + err.message;
+        showToast(err.message, true);
+      }
+    });
+
+    /* ---- 字体文件支持拖拽（从资源管理器直接拖进来）---- */
+    (function setupFontDrop() {
+      const zone = $('fontStatus');
+      if (!zone) return;
+      const stop = e => { e.preventDefault(); e.stopPropagation(); };
+      ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => {
+        stop(e); zone.style.outline = '2px dashed #4f6ef7';
+      }));
+      ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => {
+        stop(e); zone.style.outline = '';
+      }));
+      zone.addEventListener('drop', async e => {
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (!file) return;
+        const st = zone;
+        st.style.color = '#94a3b8';
+        st.textContent = '正在读取 ' + file.name + ' …';
+        try {
+          const buf = new Uint8Array(await file.arrayBuffer());
+          window.LingyiPdfFont.parseTtf(buf, 0);
+          fontBytes = buf;
+          fontName = file.name;
+          st.style.color = '#16a34a';
+          showFontReady(file.name, buf.length);
+          renderFiles();
+          try { await FontStore.put(file.name, buf); } catch (e2) { }
+          showToast('字体已就绪：' + file.name);
+        } catch (err) {
+          st.style.color = '#dc2626';
+          st.textContent = '✗ ' + err.message;
+        }
+      });
+    })();
   }
 
   /* ==================== 主流程 ==================== */
@@ -6388,7 +6484,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       if (isInPlace && !ip) throw new Error('原位替换模块未加载成功，请刷新页面');
       if (isInPlace && !fontBytes) {
         guideToFontPicker();          // 展开面板 + 滚动到控件 + 闪烁提示
-        throw new Error('「原位替换」需要中文字体：点该文件那一行的「⚠️ 选择中文字体」按钮，选 C:\\Windows\\Fonts\\simhei.ttf（只需选一次）');
+        throw new Error('「原位替换」需要中文字体：点该文件那一行的「⚠️ 选字体」按钮（会自动使用系统里的中文字体，不用找文件）');
       }
       const pages = (ir.pages || []).filter(p => (p.lines || []).length);
       if (!pages.length) throw new Error('没有解析到页面文字，无法生成（可能是扫描件）');

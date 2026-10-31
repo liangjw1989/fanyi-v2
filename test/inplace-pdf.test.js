@@ -91,6 +91,40 @@ let font = null;
     'w=' + font.widthOf(font.gidFor(0x4E2D)) + ' upm=' + font.unitsPerEm);
 }
 
+console.log('\n=== 1b) TTC 字体集合（.ttc）也要能解析 ===');
+{
+  /* 真实需求：Windows 文件对话框会隐藏字体扩展名，用户常常找不到
+     simhei.ttf，但 msyh.ttc（微软雅黑）一定存在。所以必须支持 .ttc。 */
+  const ttcCandidates = [
+    'C:\\Windows\\Fonts\\msyh.ttc',
+    'C:\\Windows\\Fonts\\simsun.ttc',
+    'C:\\Windows\\Fonts\\msyhbd.ttc'
+  ];
+  const ttcPath = ttcCandidates.find(p => { try { return fs.statSync(p).size > 100000; } catch (e) { return false; } });
+  if (!ttcPath) {
+    console.log('    · 本机没有 .ttc 字体，跳过这一组');
+  } else {
+    console.log('    ' + path.basename(ttcPath));
+    try {
+      const b = new Uint8Array(fs.readFileSync(ttcPath));
+      const sig = Buffer.from(b.slice(0, 4)).toString('latin1');
+      check('文件签名是 ttcf', sig === 'ttcf', sig);
+      const f2 = F.parseTtf(b, 0);
+      check('解析成功', !!f2);
+      check('unitsPerEm > 0', f2.unitsPerEm > 0, String(f2.unitsPerEm));
+      check('字形数 > 1000', f2.numGlyphs > 1000, String(f2.numGlyphs));
+      check('汉字「中」可取字', f2.gidFor(0x4E2D) > 0, String(f2.gidFor(0x4E2D)));
+      const u2 = new Map();
+      const w2 = F.textWidth(f2, '中文测试', 10, u2);
+      check('4 汉字宽度 35~45pt', w2 > 35 && w2 < 45, w2.toFixed(2));
+      const fo2 = F.buildFontObjects(f2, u2);
+      check('能生成 PDF 字体对象', fo2.type0.indexOf('/Type0') >= 0 && fo2.cidFont.indexOf('/CIDFontType2') >= 0);
+    } catch (e) {
+      check('解析 .ttc', false, e.message);
+    }
+  }
+}
+
 console.log('\n=== 2) Identity-H 编码与宽度 ===');
 let fontObjs = null;
 let used = null;
