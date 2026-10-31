@@ -275,25 +275,71 @@
    *   · 该行总宽 ≥ 内容宽的 55%（否则不像"跨两栏"）
    *   · 空档左侧片段宽度 < 内容宽的一半（左边注窄）
    */
+  /** 一行里被"宽空档"分隔出的块数（相邻片段间距 ≥ gapMin 才算一个分界） */
+  function countCells(ln, gapMin) {
+    const items = (ln.items || []).slice().sort((a, b) => a.x0 - b.x0);
+    if (!items.length) return 0;
+    let cells = 1;
+    for (let i = 1; i < items.length; i++) {
+      if (items[i].x0 - items[i - 1].x1 >= gapMin) cells++;
+    }
+    return cells;
+  }
+
+  /**
+   * 页面"正文栏左边界"。
+   *
+   * 【为什么不用"宽行行首的中位数"】当整页每一行都是「边注 + 正文」合并行时，
+   * 这些行都很宽，但它们行首都在边注起点（35.7）—— 中位数会得到 35.7，
+   * 于是"起点在边界左侧"永远不成立，整页一条都拆不开（真实故障）。
+   *
+   * 改用统计法：收集所有"紧跟宽空档（≥20pt）之后"的片段起始 x，
+   * 取出现最多的那个（6pt 分箱）。边注到正文的跳变正好落在这里，
+   * 纯正文页则票数不足 → 返回 null，交给兜底路径。
+   */
+  function pageBodyLeft(lines, contentW) {
+    const votes = {};
+    for (const l of (lines || [])) {
+      const items = (l.items || []).slice().sort((a, b) => a.x0 - b.x0);
+      for (let i = 1; i < items.length; i++) {
+        if (items[i].x0 - items[i - 1].x1 >= 20) {
+          const bin = Math.round(items[i].x0 / 6) * 6;
+          votes[bin] = (votes[bin] || 0) + 1;
+        }
+      }
+    }
+    let best = null, bestN = 0;
+    for (const k of Object.keys(votes)) {
+      if (votes[k] > bestN) { bestN = votes[k]; best = Number(k); }
+    }
+    if (best == null || bestN < 3) return null;
+    /* 边界必须明显靠右（是"正文栏"而不是某个词间隙） */
+    if (best < contentW * 0.15) return null;
+    return best;
+  }
+
   function splitWideGapLines(lines, contentW, minGap) {
-    /* 【重要】如果这一页本身像表格，就完全不拆。
-     * 表格行的单元格之间本来就有大空档（甚至 40~80pt），
-     * 拆行会把表格彻底拆散（实测让"表格数量 1 → 0"）。
+    const gapBase = minGap || 20;
+
+    /* 表格保护：真正的表格行是"被宽空档分隔出 ≥3 个单元格"的行。
      *
-     * 【关键】门槛必须是"每行 ≥3 个列块"，不能是 ≥2：
-     * 「边注栏 + 正文栏」被合并成一行时正好是 **2 个块**，而且第二块的
-     * 起始 x 在多行上完全一致（都落在正文栏起点）。用 ≥2 就会把这种
-     * 跨栏合并行误判成"2 列表格"，于是整页拒绝拆行，正文与版权声明
-     * 继续逐段交替 —— 这就是用户反复看到"排版还是不对"的原因。
-     */
+     * 【为什么不能数"片段数"】pdf.js 会把单词和空格拆成独立片段，
+     * 所以普通正文行也常有 5~11 个片段 —— 用它判断会几乎每页都"像表格"，
+     * 从而拒绝拆行（真实故障）。必须只数"宽空档分隔出来的单元格"。
+     *
+     * 而「边注 + 正文」合并行正好只有 **2 个单元格**，因此不会被误判。 */
     if (lines && lines.length >= 2) {
-      const multi = lines.filter(l => (l.items || []).length >= 3);
+      const multi = lines.filter(l => countCells(l, gapBase) >= 3);
       if (multi.length >= Math.ceil(lines.length * 0.5)) {
-        /* 看这些"多列块"的行，其第二块的起始 x 是否稳定对齐 */
+        /* 再看这些行的第 2 个单元格起点是否稳定对齐（表格列的典型特征） */
         const starts = [];
         for (const l of multi) {
-          const s = (l.items || []).slice().sort((a, b) => a.x0 - b.x0);
-          if (s.length >= 3) starts.push(Math.round(s[1].x0 / 6) * 6);
+          const items = (l.items || []).slice().sort((a, b) => a.x0 - b.x0);
+          let sec = null;
+          for (let i = 1; i < items.length; i++) {
+            if (items[i].x0 - items[i - 1].x1 >= gapBase) { sec = items[i].x0; break; }
+          }
+          if (sec != null) starts.push(Math.round(sec / 6) * 6);
         }
         const freq = {};
         starts.forEach(x => { freq[x] = (freq[x] || 0) + 1; });
@@ -303,38 +349,56 @@
         }
       }
     }
+
+    /* 正文栏左边界：优先在这里切，最稳 */
+    const bodyLeft = pageBodyLeft(lines, contentW);
+
     const out = [];
     for (const ln of lines) {
       const items = (ln.items || []).slice().sort((a, b) => a.x0 - b.x0);
       if (items.length < 2) { out.push(ln); continue; }
       const spanW = (ln.x1 || 0) - (ln.x0 || 0);
-      if (spanW < contentW * 0.55) { out.push(ln); continue; }
       const sizeRef = ln.size || 10;
       const gapMin = minGap || Math.max(20, sizeRef * 2);
-      /* 找"栏分界"：两种信号
-       *   ① 空档够宽（gap ≥ 20pt）—— 常见于双栏正文
-       *   ② 起始位置突然跳远（x0 跳变 ≥ 内容宽 15%）
-       *      这一条很重要：实测期刊边注栏到正文的空档只有 13pt（小于门槛），
-       *      但起始 x 从 35.7 跳到 166（跳变 130pt），这才是"另一栏开始"的标志。
-       */
       const jumpMin = Math.max(60, contentW * 0.15);
-      let best = null;
-      for (let i = 1; i < items.length; i++) {
-        const gap = items[i].x0 - items[i - 1].x1;
-        const jump = items[i].x0 - items[0].x0;
-        const prevJump = items[i - 1].x0 - items[0].x0;
-        const startJump = jump - prevJump;
-        let score = 0;
-        if (gap >= gapMin) score = gap;
-        else if (startJump >= jumpMin) score = startJump * 0.6;   // 跳变信号略降权
-        if (score > 0 && (!best || score > best.score)) best = { score: score, at: i, gap: gap, jump: startJump };
+
+      /* ① 已知正文栏左边界：**只拆"起点在边界左侧"的行**（真正的跨栏）。
+       *    不能在这一步之外乱切 —— 正文行内部常有双空格（宽度可到 20pt+），
+       *    按"空档宽度"去切会把一句话切成两段，译文中间那句就丢了
+       *    （真实故障，已用渲染截图确认）。
+       *
+       *    注意容差：正文段落的首行常有缩进（实测 x=166 与 x=188 两种），
+       *    所以"从边界开始"要允许最多一个缩进量（约 2.5 倍字号），
+       *    只允许 ±8pt 会漏掉所有缩进行，导致 "Accepted: ...In recent years," 这类拼接残留。 */
+      let cutAt = null;
+      if (bodyLeft != null) {
+        if (items[0].x0 < bodyLeft - 24) {
+          const tol = Math.max(8, sizeRef * 2.5);
+          for (let i = 1; i < items.length; i++) {
+            const nearBody = items[i].x0 >= bodyLeft - 8 && items[i].x0 <= bodyLeft + tol;
+            const leftOfBody = items[i - 1].x1 <= bodyLeft - 2;
+            if (nearBody && leftOfBody) { cutAt = i; break; }
+          }
+        }
+        if (cutAt == null) { out.push(ln); continue; }   // 边界左侧起点的行才处理，其余原样保留
+      } else {
+        /* ② 边界未知（页面没有明显跨栏证据）时的兜底：
+         *    要求整行几乎横跨全宽，且左块够窄（像栏而不是词间隙）。*/
+        if (spanW < contentW * 0.75) { out.push(ln); continue; }
+        for (let i = 1; i < items.length; i++) {
+          const gap = items[i].x0 - items[i - 1].x1;
+          const startJump = items[i].x0 - items[i - 1].x0;
+          if (gap < gapMin && startJump < jumpMin) continue;
+          const leftW = items[i - 1].x1 - items[0].x0;
+          if (leftW < Math.max(20, contentW * 0.06) || leftW >= contentW * 0.5) continue;
+          cutAt = i;
+          break;
+        }
       }
-      if (!best) { out.push(ln); continue; }
-      const leftW = items[best.at - 1].x1 - items[0].x0;
-      if (leftW >= contentW * 0.5) { out.push(ln); continue; }
-      /* 拆成两条（各自保持原有 y 与字号） */
-      out.push(finishLine(items.slice(0, best.at), ln.size));
-      out.push(finishLine(items.slice(best.at), ln.size));
+
+      if (cutAt == null) { out.push(ln); continue; }
+      out.push(finishLine(items.slice(0, cutAt), ln.size));
+      out.push(finishLine(items.slice(cutAt), ln.size));
     }
     /* 拆完可能顺序乱，重新按 y 排（同行按 x 排）*/
     out.sort((a, b) => (a.y0 - b.y0) || (a.x0 - b.x0));

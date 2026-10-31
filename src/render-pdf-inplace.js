@@ -53,24 +53,37 @@
       const blocks = [];
       let cur = null;
       for (const l of lines) {
-        if (cur && Math.abs(l.x - cur.x) <= 6 && (l.top - cur.yEnd) < Math.max(3.2, l.size * 1.15)) {
-          const prev = cur.text;
-          const next = l.text;
-          const needSpace = /[A-Za-z0-9]$/.test(prev) && /^[A-Za-z0-9(]/.test(next);
-          cur.text = prev + (needSpace ? ' ' : '') + next;
-          cur.yEnd = l.top + l.size;
-          cur.x1 = Math.max(cur.x1, l.x1);
-        } else {
-          if (cur) blocks.push(cur);
-          cur = {
-            x: Math.round(l.x * 10) / 10,
-            y: Math.round(l.top * 10) / 10,
-            yEnd: l.top + l.size,
-            x1: l.x1,
-            size: l.size,
-            text: l.text
-          };
+        if (cur) {
+          const sameIndent = Math.abs(l.x - cur.x) <= 6;
+          /* 首行缩进：后续行比首行更靠左、且首行已经排到接近右边界，
+             说明它们属于同一段（期刊首行缩进 1~2 个字）。
+             不合并的话段落会被切成一块块，译文只能塞进一两行而被截断。 */
+          const indentBack = (l.x < cur.x) && (cur.x - l.x) <= Math.max(12, cur.size * 2.6) &&
+            (cur.x1 >= cur.maxRight - Math.max(6, cur.size * 2.2));
+          const closeY = (l.top - cur.yEnd) < Math.max(3.2, l.size * 1.15);
+          if (closeY && (sameIndent || indentBack)) {
+            const prev = cur.text;
+            const next = l.text;
+            const needSpace = /[A-Za-z0-9]$/.test(prev) && /^[A-Za-z0-9(]/.test(next);
+            cur.text = prev + (needSpace ? ' ' : '') + next;
+            cur.yEnd = l.top + l.size;
+            cur.x1 = Math.max(cur.x1, l.x1);
+            cur.maxRight = Math.max(cur.maxRight, l.x1);
+            /* 合并后块左边界取更靠左的那个（正文左边界） */
+            if (l.x < cur.x) cur.x = l.x;
+            continue;
+          }
+          blocks.push(cur);
         }
+        cur = {
+          x: Math.round(l.x * 10) / 10,
+          y: Math.round(l.top * 10) / 10,
+          yEnd: l.top + l.size,
+          x1: l.x1,
+          maxRight: l.x1,
+          size: l.size,
+          text: l.text
+        };
       }
       if (cur) blocks.push(cur);
 
@@ -108,11 +121,37 @@
   function buildOps(info, pageH, F, font, used) {
     const ops = [];
     if (!info || !info.blocks) return ops;
-    for (const b of info.blocks) {
-      if (!b.text || !String(b.text).trim()) continue;
+
+    /* 先按纵向排序，并预先算出"当前块向下还能用到哪里"（下一个同列块的顶）。
+     * 为什么需要：译文放不下时如果一味缩字号，缩到下限仍放不下就会**继续往下画**，
+     * 压到下一块上，出现文字重叠（真实故障，已用渲染截图确认）。
+     * 正确做法：允许向下方空白处延伸，但不越过下一个块；实在放不下再缩字号。 */
+    const blocks = info.blocks
+      .filter(b => b && b.text && String(b.text).trim())
+      .slice()
+      .sort((a, b) => a.y - b.y);
+
+    const limitFor = (b, idx) => {
+      let limit = pageH - 2;                       // 页面底部（y 向下坐标）
+      for (let j = idx + 1; j < blocks.length; j++) {
+        const nb = blocks[j];
+        if (nb.y <= b.y) continue;
+        const ox = Math.min(b.x + (b.w || 0), nb.x + (nb.w || 0)) - Math.max(b.x, nb.x);
+        if (ox <= 2) continue;                     // 不同列，不算阻挡
+        limit = Math.min(limit, nb.y - 1);
+        break;
+      }
+      return Math.max(b.y + (b.size || 10), limit);
+    };
+
+    for (let idx = 0; idx < blocks.length; idx++) {
+      const b = blocks[idx];
       const bw = Math.max(12, b.w || 120);
       const bh = Math.max(4, b.h || (b.size || 10));
-      /* 白底：盖掉原文（略微外扩，压住抗锯齿边缘）*/
+      const availBottom = limitFor(b, idx);
+      const availH = Math.max(bh, availBottom - b.y);
+
+      /* 白底：只盖原文字块本身 */
       ops.push({
         kind: 'rect',
         x: b.x - 0.6,
@@ -120,20 +159,24 @@
         w: bw + 1.2,
         h: bh + 1.2
       });
-      /* 字号自适应：先按原字号试，放不下就缩，但不小于原字号 55% */
+
+      /* 字号自适应：先利用下方空白，仍放不下再缩（不小于原字号 55%）*/
       let size = Math.max(1, b.size || 10);
       let lines = null;
       for (let attempt = 0; attempt < 7; attempt++) {
         lines = wrapWithFont(F, font, b.text, size, bw, used);
         const lh = size * 1.16;
-        if (lines.length * lh <= bh + lh * 0.35) break;
+        if (lines.length * lh <= availH + lh * 0.35) break;
         const next = size * 0.92;
         if (next < (b.size || 10) * 0.55) { size = next; lines = wrapWithFont(F, font, b.text, size, bw, used); break; }
         size = next;
       }
       const lh = size * 1.16;
       let baseline = pageH - b.y - size * 0.92;
+      let drawn = 0;
       for (const ln of lines) {
+        /* 到底线就停：宁可截断也不画到下一个块上（重叠比截断更糟）*/
+        if (drawn > 0 && (b.y + size + drawn * lh) > availBottom + 2) break;
         if (ln && ln.trim()) {
           ops.push({
             kind: 'text',
@@ -144,6 +187,7 @@
           });
         }
         baseline -= lh;
+        drawn++;
       }
     }
     return ops;

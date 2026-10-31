@@ -386,7 +386,7 @@
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.7.2';
+  const VERSION = '2.8.0';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -742,6 +742,13 @@
     if (ext === 'pdf') {
       onStage('解析 PDF 版式（分栏/段落/表格）…');
       await window.ensureLib('pdfjsLib');
+      /* worker 指向本地 vendor（离线可用、不用连 CDN）；缺失时 pdf.js 会自动降级 */
+      try {
+        if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions &&
+            !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = './vendor/pdf.worker.min.js';
+        }
+      } catch (e) { }
       const ir = await px.extractPDF(f.file, {
         pdfjs: window.pdfjsLib,
         fileName: f.name,
