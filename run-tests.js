@@ -24,6 +24,7 @@ const SUITES = [
   ['diagnostics-e2e.test.js', '诊断端到端（真实解析→报告可用）'],
   ['overlay-pdf.test.js', '叠加 PDF（图片型写入器/折行）'],
   ['inplace-pdf.test.js', '原位替换 PDF（内嵌字体·可选中）'],
+  ['coords.test.js', '坐标方向与绘制位置（防上下翻转）'],
   ['scope-check.js', '作用域与控件一致性（防 is not defined）'],
   ['merge-table.test.js', '表格碎片合并（PDF 表格还原）'],
   ['docx-columns.test.js', 'Word 分栏节生成'],

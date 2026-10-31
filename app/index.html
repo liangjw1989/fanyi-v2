@@ -386,7 +386,7 @@
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.7.1';
+  const VERSION = '2.7.2';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -511,58 +511,16 @@
   }
   function bytes(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : (n / 1024).toFixed(0) + ' KB'; }
   function baseName(name) { return String(name).replace(/\.[^.]+$/, ''); }
-
   /**
-   * 叠加输出专用：把每页的"行"合并成"段落块"。
-   * 合并条件（保守）：同一起始 x（±6pt）、垂直间距 < 1.15 倍字号。
-   * 块用于两件事：① 作为翻译单元（整段翻译质量远好于逐行）
-   *                ② 作为涂白/写译文的位置框
+   * 叠加/原位输出：把每页的行合并成段落块（坐标转成 y 轴向下）。
+   * 实现放在 src/render-pdf-inplace.js 的 buildBlocks —— 那里有单元测试，
+   * 且坐标系约定（pdf-extract 是 y 轴向上）只在一处维护，避免两处不一致。
    */
   function buildOverlayBlocks(pages) {
-    return pages.map(p => {
-      const lines = (p.lines || [])
-        .filter(l => l && l.text && String(l.text).trim())
-        .slice()
-        .sort((a, b) => (a.y - b.y) || (a.x - b.x));
-      const blocks = [];
-      let cur = null;
-      for (const l of lines) {
-        const size = l.size || 10;
-        const x1 = (l.x1 != null) ? l.x1 : (l.x + Math.max(40, String(l.text).length * size * 0.5));
-        if (cur && Math.abs(l.x - cur.x) <= 6 && (l.y - cur.yEnd) < Math.max(3.2, size * 1.15)) {
-          /* 同一段落：接上。中英文之间补空格，避免单词粘连 */
-          const prev = cur.text;
-          const next = String(l.text).trim();
-          const needSpace = /[A-Za-z0-9]$/.test(prev) && /^[A-Za-z0-9(]/.test(next);
-          cur.text = prev + (needSpace ? ' ' : '') + next;
-          cur.yEnd = l.y + size;
-          cur.x1 = Math.max(cur.x1, x1);
-        } else {
-          if (cur) blocks.push(cur);
-          cur = {
-            x: Math.round(l.x * 10) / 10,
-            y: Math.round(l.y * 10) / 10,
-            yEnd: l.y + size,
-            x1: x1,
-            size: size,
-            text: String(l.text).trim()
-          };
-        }
-      }
-      if (cur) blocks.push(cur);
-      return {
-        number: p.number,
-        width: p.width,
-        height: p.height,
-        blocks: blocks.map(b => ({
-          x: b.x, y: b.y,
-          w: Math.max(40, b.x1 - b.x),
-          h: Math.max(b.size * 1.1, b.yEnd - b.y),
-          size: b.size,
-          text: b.text
-        }))
-      };
-    });
+    if (!window.LingyiPdfInPlace || !window.LingyiPdfInPlace.buildBlocks) {
+      throw new Error('分块模块未加载成功，请刷新页面');
+    }
+    return window.LingyiPdfInPlace.buildBlocks(pages);
   }
   function download(blobOrUrl, filename) {
     const a = document.createElement('a');

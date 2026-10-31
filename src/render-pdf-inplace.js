@@ -23,6 +23,133 @@
   }
 
   /**
+   * 把每页的"行"合并成"段落块"，并把坐标统一成 **y 轴向下（从页面顶部算）**。
+   *
+   * 【坐标系·必读】pdf-extract 产出的行坐标是 **y 轴向上（从页面底部算）**：
+   * pdf.js 的 textContent item 没有 pageHeight 字段，makeItem 走的是
+   * `baseline = tr[5]` 分支，也就是 PDF 原始坐标。
+   * 而 canvas 绘制与 PDF 内容流在这里都按 y 轴向下处理，所以必须转换一次：
+   *     top = 页高 - (y + 字号)
+   * 不转换的后果（真实故障，已用渲染截图确认）：
+   *   · 整页内容上下翻转（页面底部的版权声明跑到顶部）
+   *   · 分块逻辑失效 → 整页被合并成一个巨大块 → 译文全部叠在一起
+   *
+   * 合并条件（保守）：同一起始 x（±6pt）、垂直间距 < 1.15 倍字号。
+   * 块有两个用途：① 翻译单元（整段翻译质量远好于逐行）
+   *               ② 涂白 / 写译文的位置框
+   */
+  function buildBlocks(pages) {
+    return (pages || []).map(p => {
+      const H = p.height || 842;
+      const lines = (p.lines || [])
+        .filter(l => l && l.text && String(l.text).trim())
+        .map(l => {
+          const size = l.size || 10;
+          const x1 = (l.x1 != null) ? l.x1 : (l.x + Math.max(40, String(l.text).length * size * 0.5));
+          return { x: l.x, top: H - (l.y + size), size: size, x1: x1, text: String(l.text).trim() };
+        })
+        .sort((a, b) => (a.top - b.top) || (a.x - b.x));
+
+      const blocks = [];
+      let cur = null;
+      for (const l of lines) {
+        if (cur && Math.abs(l.x - cur.x) <= 6 && (l.top - cur.yEnd) < Math.max(3.2, l.size * 1.15)) {
+          const prev = cur.text;
+          const next = l.text;
+          const needSpace = /[A-Za-z0-9]$/.test(prev) && /^[A-Za-z0-9(]/.test(next);
+          cur.text = prev + (needSpace ? ' ' : '') + next;
+          cur.yEnd = l.top + l.size;
+          cur.x1 = Math.max(cur.x1, l.x1);
+        } else {
+          if (cur) blocks.push(cur);
+          cur = {
+            x: Math.round(l.x * 10) / 10,
+            y: Math.round(l.top * 10) / 10,
+            yEnd: l.top + l.size,
+            x1: l.x1,
+            size: l.size,
+            text: l.text
+          };
+        }
+      }
+      if (cur) blocks.push(cur);
+
+      return {
+        number: p.number,
+        width: p.width,
+        height: p.height,
+        blocks: blocks.map(b => ({
+          x: b.x, y: b.y,
+          w: Math.max(40, b.x1 - b.x),
+          h: Math.max(b.size * 1.1, b.yEnd - b.y),
+          size: b.size,
+          text: b.text
+        }))
+      };
+    });
+  }
+
+  /**
+   * 由"段落块"生成绘制指令（白底矩形 + 每行文字）。
+   *
+   * 输入块的坐标是 **y 轴向下（从页面顶部算）**（由 buildBlocks 保证）；
+   * PDF 内容流是 **y 轴向上（从页面底部算）**，所以这里做一次转换：
+   *   矩形底边  = 页高 - (块顶 + 块高)
+   *   首行基线  = 页高 - 块顶 - 0.92×字号（略微下沉，让字形落在框内）
+   * 之后每行基线减去行高（在 PDF 里就是往下走）。
+   *
+   * @param {Object} info 单页 { blocks:[{x,y,w,h,size,text}] }
+   * @param {number} pageH 页高（pt）
+   * @param {Object} F     LingyiPdfFont
+   * @param {Object} font  parseTtf 结果
+   * @param {Map}    used  字形使用记录（会被填充）
+   * @returns {Array} ops
+   */
+  function buildOps(info, pageH, F, font, used) {
+    const ops = [];
+    if (!info || !info.blocks) return ops;
+    for (const b of info.blocks) {
+      if (!b.text || !String(b.text).trim()) continue;
+      const bw = Math.max(12, b.w || 120);
+      const bh = Math.max(4, b.h || (b.size || 10));
+      /* 白底：盖掉原文（略微外扩，压住抗锯齿边缘）*/
+      ops.push({
+        kind: 'rect',
+        x: b.x - 0.6,
+        y: pageH - (b.y + bh) - 0.6,
+        w: bw + 1.2,
+        h: bh + 1.2
+      });
+      /* 字号自适应：先按原字号试，放不下就缩，但不小于原字号 55% */
+      let size = Math.max(1, b.size || 10);
+      let lines = null;
+      for (let attempt = 0; attempt < 7; attempt++) {
+        lines = wrapWithFont(F, font, b.text, size, bw, used);
+        const lh = size * 1.16;
+        if (lines.length * lh <= bh + lh * 0.35) break;
+        const next = size * 0.92;
+        if (next < (b.size || 10) * 0.55) { size = next; lines = wrapWithFont(F, font, b.text, size, bw, used); break; }
+        size = next;
+      }
+      const lh = size * 1.16;
+      let baseline = pageH - b.y - size * 0.92;
+      for (const ln of lines) {
+        if (ln && ln.trim()) {
+          ops.push({
+            kind: 'text',
+            x: b.x,
+            y: baseline,
+            size: size,
+            hex: F.encodeText(font, ln, used)
+          });
+        }
+        baseline -= lh;
+      }
+    }
+    return ops;
+  }
+
+  /**
    * 用真实字体度量折行（中文按字、西文按词），返回 { lines, width }
    */
   function wrapWithFont(F, font, text, size, maxW, used) {
@@ -224,50 +351,7 @@
       const info = metaByNum.get(n);
       const pageW = info ? info.width : vp.width / scale;
       const pageH = info ? info.height : vp.height / scale;
-      const ops = [];
-
-      if (info && info.blocks) {
-        for (const b of info.blocks) {
-          if (!b.text || !String(b.text).trim()) continue;
-          const bw = Math.max(12, b.w || 120);
-          const bh = Math.max(4, b.h || (b.size || 10));
-          /* 白底：盖掉原文（略微外扩，压住抗锯齿边缘）*/
-          ops.push({
-            kind: 'rect',
-            x: b.x - 0.6,
-            y: pageH - (b.y + bh) - 0.6,
-            w: bw + 1.2,
-            h: bh + 1.2
-          });
-          /* 译文：字号自适应，先按原字号试，放不下再缩 */
-          let size = Math.max(1, b.size || 10);
-          let lines = null;
-          for (let attempt = 0; attempt < 7; attempt++) {
-            lines = wrapWithFont(F, font, b.text, size, bw, used);
-            const lh = size * 1.16;
-            if (lines.length * lh <= bh + lh * 0.35) break;
-            /* 放不下：缩字号，但不少于原字号 55% */
-            const next = size * 0.92;
-            if (next < (b.size || 10) * 0.55) { size = next; lines = wrapWithFont(F, font, b.text, size, bw, used); break; }
-            size = next;
-          }
-          const lh = size * 1.16;
-          /* PDF y 轴向上：第一行基线 ≈ 块底 - 下沉量 */
-          let baseline = pageH - b.y - size * 0.92;
-          for (const ln of lines) {
-            if (ln && ln.trim()) {
-              ops.push({
-                kind: 'text',
-                x: b.x,
-                y: baseline,
-                size: size,
-                hex: F.encodeText(font, ln, used)
-              });
-            }
-            baseline -= lh;
-          }
-        }
-      }
+      const ops = buildOps(info, pageH, F, font, used);
 
       const dataUrl = canvas.toDataURL('image/jpeg', quality);
       const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
@@ -308,6 +392,8 @@
 
   root.LingyiPdfInPlace = {
     renderInPlace: renderInPlace,
+    buildBlocks: buildBlocks,
+    buildOps: buildOps,
     buildPdf: buildPdf,
     wrapWithFont: wrapWithFont
   };
