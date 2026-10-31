@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <!--
-  灵译 LingYi · 文档翻译与版式还原引擎  v2.8.0
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.8.1
   © 2026 LingYi. All rights reserved.
   许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
   本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
@@ -3233,7 +3233,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.8.0 | sha256:f5f7569d8320cc9b | 2026-10-31 -->
+<!-- build: v2.8.1 | sha256:269a9cfb967dc6f2 | 2026-10-31 -->
 </body></html>`;
   }
 
@@ -5816,7 +5816,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.8.0';
+  const VERSION = '2.8.1';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -6654,8 +6654,12 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
       pageBlocks.forEach(p => p.blocks.forEach(b => flat.push(b)));
 
       /* 2) 用临时 IR 走完整翻译流水线（自动获得术语库/符号保护/翻译记忆） */
+      /* 注意：每个块必须有唯一 id！core.applyTranslation 用 blockId 定位块，
+         没有 id 时 findBlock 会用 .id === undefined 匹配到**第一个块**，
+         结果所有译文都写进 block[0]，其余块保持原文（真实故障：
+         整份 22 页只有 27 个中文字符，全挤在页面左上角）。 */
       const tmpIr = {
-        blocks: flat.map(b => ({ type: 'paragraph', runs: [{ t: b.text }] }))
+        blocks: flat.map((b, i) => ({ id: 'ob' + i, type: 'paragraph', runs: [{ t: b.text }] }))
       };
       const res = await tr.translateIR(tmpIr, {
         apiUrl: apiUrl,

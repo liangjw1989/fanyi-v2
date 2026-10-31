@@ -386,7 +386,7 @@
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.8.0';
+  const VERSION = '2.8.1';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -1224,8 +1224,12 @@
       pageBlocks.forEach(p => p.blocks.forEach(b => flat.push(b)));
 
       /* 2) 用临时 IR 走完整翻译流水线（自动获得术语库/符号保护/翻译记忆） */
+      /* 注意：每个块必须有唯一 id！core.applyTranslation 用 blockId 定位块，
+         没有 id 时 findBlock 会用 .id === undefined 匹配到**第一个块**，
+         结果所有译文都写进 block[0]，其余块保持原文（真实故障：
+         整份 22 页只有 27 个中文字符，全挤在页面左上角）。 */
       const tmpIr = {
-        blocks: flat.map(b => ({ type: 'paragraph', runs: [{ t: b.text }] }))
+        blocks: flat.map((b, i) => ({ id: 'ob' + i, type: 'paragraph', runs: [{ t: b.text }] }))
       };
       const res = await tr.translateIR(tmpIr, {
         apiUrl: apiUrl,
