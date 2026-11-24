@@ -26,6 +26,7 @@ const SUITES = [
   ['inplace-pdf.test.js', '原位替换 PDF（内嵌字体·可选中）'],
   ['coords.test.js', '坐标方向与绘制位置（防上下翻转）'],
   ['transform-ir-mapping.test.js', '临时 IR 译文回写映射（防写错块）'],
+  ['engine-fallback.test.js', '引擎额度/鉴权失败自动切换（防静默输出原文）'],
   ['scope-check.js', '作用域与控件一致性（防 is not defined）'],
   ['merge-table.test.js', '表格碎片合并（PDF 表格还原）'],
   ['docx-columns.test.js', 'Word 分栏节生成'],

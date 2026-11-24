@@ -242,10 +242,14 @@ async function route(engine, text, target, system) {
   }
 }
 
-/** 引擎失败时自动降级：baidu/deepseek 挂了就用腾讯云兜底，尽量不让用户白等 */
+/** 引擎失败时自动降级。
+ * 真实故障（2026-11）：腾讯云当月免费额度用完，而下面这张链在 requested='tencent' 时
+ * 只有 ['tencent'] 一项 → 直接返回"所有引擎均失败"，可百度与 DeepSeek 明明都是好的。
+ * 现在改成"请求的引擎优先，其余全部兜底"，并在响应里明确告知实际用的是哪个引擎。 */
 function fallbackChain(engine) {
+    const all = ['deepseek', 'baidu', 'tencent'];   // AI 质量 > 免费额度大 > 兜底
     const chain = [engine];
-    if (engine !== 'tencent') chain.push('tencent');
+    for (const e of all) if (e !== engine) chain.push(e);
     return chain;
 }
 
@@ -314,6 +318,8 @@ exports.main_handler = async (event, context) => {
                 code: 0,
                 result: out,
                 engine,
+                requested,
+                fellBack: engine !== requested,     // 前端据此提示"已自动改用 X"
                 markers: { src: rep.srcCount, out: rep.outCount }
             });
         } catch (err) {

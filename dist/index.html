@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <!--
-  灵译 LingYi · 文档翻译与版式还原引擎  v2.8.1
+  灵译 LingYi · 文档翻译与版式还原引擎  v2.8.2
   © 2026 LingYi. All rights reserved.
   许可：个人学习与非商业使用免费；商业使用、二次分发、去标识后再分发均需获得书面授权。
   本文件由 build.js 自动生成（单文件版），请勿手工修改；修改请编辑 app/index.html 与 src/*.js。
@@ -3233,7 +3233,7 @@ ${showToolbar ? `<div class="ly-toolbar"><span>灵译 · 版式还原预览</spa
 </div>` : ''}
 <div class="ly-doc"><div class="ly-page">${body}</div></div>
 ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print();}catch(e){}},400);});<\/script>' : ''}
-<!-- build: v2.8.1 | sha256:269a9cfb967dc6f2 | 2026-10-31 -->
+<!-- build: v2.8.2 | sha256:900f88c011bf8c8f | 2026-11-24 -->
 </body></html>`;
   }
 
@@ -5512,23 +5512,77 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     return rules.join('\n');
   }
 
+  /* 这些字样代表"这个引擎整体不可用"（额度用完 / 鉴权失败 / 欠费），
+   * 重试没有意义，只能换引擎。
+   * 真实故障：腾讯云 2026-11 免费额度耗尽，云函数返回
+   *   {"code":-1,"result":"所有引擎均失败 → tencent: service free amount of this month has been used up"}
+   * 旧代码把它当普通失败 → 逐段兜底也全失败 → 静默输出**全文未翻译**的文件。 */
+  const FATAL_RE = /free amount|used up|quota|额度|欠费|余额|UNAUTHORIZED|Unauthorized|AUTH_FAILED|invalid.*(key|credential|secret)|验证失败|鉴权|not authorized|insufficient/i;
+
+  function isFatalMessage(msg) {
+    return FATAL_RE.test(String(msg || ''));
+  }
+
+  /* 云函数自己也会做引擎降级（请求的引擎挂了就用别的兜底），
+   * 并把实际使用的引擎写在响应里。记下来，最后告诉用户"实际用的是哪个"。 */
+  let lastServerEngine = null;
+  let lastServerFellBack = false;
+
   async function callOnce(opts) {
     const f = opts.fetchImpl || (typeof fetch !== 'undefined' ? fetch : null);
     if (!f) throw new Error('当前环境不支持 fetch');
+    const eng = opts.engine || 'tencent';
     const body = {
       text: encodeMarkers(opts.text),          // ⟦V3⟧ → ##V3##（引擎友好写法）
       target: TENCENT_CODE[opts.target] || opts.target,
-      engine: opts.engine || 'tencent'
+      engine: eng
     };
-    if (opts.engine === 'deepseek') body.system = opts.system;
-    const res = await f(opts.apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
-    if (!data || data.code !== 0) throw new Error((data && data.result) || '翻译接口返回错误');
-    return decodeMarkers(data.result);       // ##V3## → ⟦3⟧
+    if (eng === 'deepseek') body.system = opts.system;
+
+    let res;
+    try {
+      res = await f(opts.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    } catch (netErr) {
+      const e = new Error('无法连接翻译服务：' + (netErr && netErr.message || netErr));
+      e.fatal = true;                       // 网络断了/地址错 → 换引擎也没用，但要停下来
+      e.network = true;
+      throw e;
+    }
+
+    /* 先把正文读成文本，再解析：500 时 body 里往往带着真实原因
+     * （"额度用完"就写在这里），旧代码直接 res.json() 会把它丢掉。
+     * 兼容只提供 json() 的测试替身。 */
+    let rawText = '';
+    let data = null;
+    if (typeof res.text === 'function') {
+      rawText = await res.text();
+      try { data = rawText ? JSON.parse(rawText) : null; } catch (e) { data = null; }
+    } else if (typeof res.json === 'function') {
+      try { data = await res.json(); } catch (e) { data = null; }
+      rawText = data ? JSON.stringify(data) : '';
+    } else {
+      data = null;
+    }
+
+    if (data && data.code === 0 && typeof data.result === 'string') {
+      if (data.engine) {
+        lastServerEngine = data.engine;
+        if (data.fellBack) lastServerFellBack = true;
+      }
+      return decodeMarkers(data.result);     // ##V3## → ⟦3⟧
+    }
+
+    const msg = (data && data.result) || ('HTTP ' + res.status + ' ' + String(rawText || '').slice(0, 200)) || '翻译接口返回错误';
+    const e = new Error(msg);
+    e.status = res.status;
+    e.engine = eng;
+    /* HTTP 5xx / 429 / 鉴权类错误都视为"引擎不可用" */
+    e.fatal = !!isFatalMessage(msg) || res.status >= 500 || res.status === 429 || res.status === 401 || res.status === 403;
+    throw e;
   }
 
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -5536,6 +5590,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
   /** 逐片段兜底翻译（批量标记被破坏时使用） */
   async function translateOneByOne(units, opts, onProgress) {
     const out = [];
+    let fatalCount = 0;
     for (let i = 0; i < units.length; i++) {
       let text = null;
       try {
@@ -5543,7 +5598,17 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
           text: units[i].payload != null ? units[i].payload : units[i].text,
           engine: opts.fallbackEngine || 'tencent'
         }));
-      } catch (e) { text = null; }
+        fatalCount = 0;
+      } catch (e) {
+        text = null;
+        /* 致命错误（额度用完/鉴权失败）不要一段一段地重试几百次 ——
+         * 那样只是把"静默输出原文"拖得更久。连续 3 段都致命就向上抛，
+         * 由 translateIR 换引擎或明确报错。 */
+        if (e && e.fatal) {
+          fatalCount++;
+          if (fatalCount >= 3 || units.length === 1) throw e;
+        }
+      }
       out.push(text);
       if (onProgress) onProgress(i + 1, units.length);
       await sleep(opts.delay == null ? 120 : opts.delay);   // 真正的 QPS 限流在云函数里做
@@ -5625,7 +5690,11 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     const batches = core.buildBatches(todo.map(u => ({ text: u.payload, ref: u })), opts.maxChars || 4000);
 
     const system = buildSystemPrompt(opts.target, opts.mode);
-    const engine = opts.engine || 'tencent';
+    let engine = opts.engine || 'tencent';
+
+    /* 引擎人话名（界面上要用） */
+    const ENGINE_NAME = { tencent: '腾讯云', baidu: '百度翻译', deepseek: 'DeepSeek' };
+    const engineName = e => ENGINE_NAME[e] || e;
 
     /* ---- 3) 逐批翻译 ----
      * 实测：腾讯云机器翻译会随机丢弃句首的标记（⟦⟧ 和 ##n## 都会丢），
@@ -5638,10 +5707,11 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
      * mode='safe' 时跳过批量，直接逐段（最稳，但调用次数=片段数）
      */
     const safeMode = opts.mode === 'safe';
+
     /* 引擎可靠性记忆：同一个"地址+引擎"组合只要证明过会破坏标记，
      * 之后的文档直接走逐段，不必再从头踩一遍坑（这是"翻译偏慢"的主因之一）。 */
-    const relKey = String(opts.apiUrl || '') + '|' + String(engine);
-    const knownBad = ENGINE_MARKER_RELIABLE[relKey] === false;
+    let relKey = String(opts.apiUrl || '') + '|' + String(engine);
+    let knownBad = ENGINE_MARKER_RELIABLE[relKey] === false;
     let reliable = !safeMode && !knownBad;
     if (safeMode || knownBad) {
       if (opts.onProgress) {
@@ -5653,7 +5723,16 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     let consecutiveLoss = 0;
 
     let done = stat.fromCache;
+    const finishedUnits = new Set();
+
+    /* 单个引擎的一整轮翻译。致命错误（额度/鉴权）向上抛，交给下面的换引擎逻辑。 */
+    async function runBatchPass() {
+    const beforeTranslated = stat.translated;
+    const pendingAtStart = units.filter(u => !finishedUnits.has(u)).length;
+    let lastErr = null;          /* 这一轮里最有说服力的失败原因（用于报错文案） */
     for (const batch of batches) {
+      /* 换引擎重跑时，已经翻好的批直接跳过，不重复烧额度 */
+      if (batch.items.every(x => finishedUnits.has(x.ref))) continue;
       const refs = batch.items.map(x => x.ref);
       /* 这批理应带回的标记（分段标记 + 占位符），用于发现引擎"吃掉"标记 */
       const wantMarkers = batch.items.reduce(
@@ -5684,6 +5763,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
           const got = parsed.filter(x => x != null && x !== '').length;
           if (got >= Math.max(1, Math.ceil(batch.items.length * 0.9))) payloads = parsed;
         } catch (e) {
+          if (e && e.fatal) lastErr = e;
           if (!lostMarkers) await sleep(600 * (attempt + 1));
         }
         attempt++;
@@ -5765,18 +5845,95 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
         if (text == null || text === '') {
           core.applyTranslation(ir, u, null);
           stat.fallback++; done++;
+          /* 注意：**失败不要标记 finishedUnits** —— 换引擎重跑时必须重试这一段。
+           * （曾经的 bug：不分成败都 add，导致第二个引擎整批被跳过、
+           *   一段都没翻却"顺利跑完"，最后报"没有任何译文"。） */
         } else {
           if (lost.length) stat.missingSymbols = stat.missingSymbols.concat(lost);
           core.applyTranslation(ir, u, text);
           tmStore(u, opts, text);
           stat.tmSaved++;
           stat.translated++; done++;
+          finishedUnits.add(u);
         }
       }
 
       if (opts.onProgress) opts.onProgress(done, units.length, '已翻译 ' + done + '/' + units.length + ' 段');
       await sleep(opts.delay == null ? 200 : opts.delay);
     }
+
+    /* 这一轮该翻的段落一段都没翻出来 → 判定"该引擎不可用"，
+     * 抛致命错误交给上层换引擎。
+     * 这一步是这次事故（腾讯云额度用完 → 静默输出 0 中文 docx）的关键：
+     * 旧代码把"每段都失败"当成正常的 fallback，于是整轮"顺利跑完"。 */
+    if (pendingAtStart > 0 && stat.translated === beforeTranslated) {
+      const err = lastErr || new Error('该引擎没有返回任何译文');
+      err.fatal = true;
+      throw err;
+    }
+    }
+
+    /* ---- 4) 引擎自动切换 ----
+     * 真实故障（2026-11）：腾讯云当月 500 万字符免费额度用完，云函数对每个
+     * 翻译请求都返回 HTTP 500 duration "service free amount of this month has
+     * been used up"。旧逻辑把失败当"保留原文"，于是一份 25 页的论文被
+     * 静默输出成 0 个中文字符的 docx —— 用户以为"翻译没成功"却看不到原因。
+     *
+     * 现在：
+     *   · 致命错误（额度/鉴权/5xx）→ 自动换成下一个可用引擎继续翻
+     *   · 全部引擎都不可用 → 抛错，由界面明确提示（绝不输出假装完成的原文）
+     */
+    const ENGINE_ORDER = ['deepseek', 'baidu', 'tencent'];
+    const engineQueue = [engine].concat(ENGINE_ORDER.filter(e => e !== engine));
+    const shortMsg = m => String(m || '').replace(/\s+/g, ' ').slice(0, 90);
+
+    for (let ei = 0; ei < engineQueue.length; ei++) {
+      const eng = engineQueue[ei];
+      engine = eng;
+      relKey = String(opts.apiUrl || '') + '|' + String(eng);
+      knownBad = ENGINE_MARKER_RELIABLE[relKey] === false;
+      reliable = !safeMode && !knownBad;
+      stat.engine = eng;
+      try {
+        await runBatchPass();
+        break;                                   // 顺利跑完，不再换引擎
+      } catch (e) {
+        const last = (ei === engineQueue.length - 1);
+        if (!e || !e.fatal || last) {
+          /* 换不动了：把"已经翻好多少"讲清楚，然后中止，让界面报错 */
+          const err = new Error(
+            '翻译服务不可用：' + shortMsg(e && e.message) +
+            (stat.translated ? '（已翻译 ' + stat.translated + ' / ' + units.length + ' 段）' : '') +
+            '。请更换引擎（推荐 DeepSeek 或百度翻译），或检查云函数额度。'
+          );
+          err.fatal = true;
+          err.engine = eng;
+          err.stat = stat;
+          throw err;
+        }
+        stat.engineFailures = (stat.engineFailures || []).concat([{ engine: eng, message: shortMsg(e.message) }]);
+        stat.engineSwitched = (stat.engineSwitched || 0) + 1;
+        if (opts.onProgress) {
+          opts.onProgress(done, units.length,
+            '「' + engineName(eng) + '」不可用（' + shortMsg(e.message) + '），自动切换为「' +
+            engineName(engineQueue[ei + 1]) + '」继续翻译');
+        }
+      }
+    }
+
+    /* ---- 5) 兜底校验：一段都没翻成，就绝不能当成功 ----
+     * 这条断言是这次事故的护栏：宁可报错，也不产出"看着完成了、其实全是原文"的文件。 */
+    if (!stat.translated && units.length) {
+      const err = new Error('翻译没有产生任何译文（' + units.length + ' 段全部失败）。' +
+        '常见原因：腾讯云/百度当月免费额度用完、密钥失效、或网络被拦截。请更换引擎后重试。');
+      err.fatal = true;
+      err.stat = stat;
+      throw err;
+    }
+
+    /* 云函数端的降级结果：告诉用户实际是哪个引擎翻的 */
+    if (lastServerEngine) stat.serverEngine = lastServerEngine;
+    if (lastServerFellBack) stat.serverFellBack = true;
 
     saveTM();
     return stat;
@@ -5816,7 +5973,7 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.8.1';
+  const VERSION = '2.8.2';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -6083,7 +6240,17 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     }
     if (e.target.classList.contains('process-btn')) {
       e.target.disabled = true;
-      try { await processFile(f); } catch (err) { console.error(err); f.status = 'error'; f.message = '失败：' + err.message; setStage(f); showToast('翻译失败：' + err.message, true); }
+      try { await processFile(f); } catch (err) {
+        console.error(err);
+        f.status = 'error';
+        /* 致命错误（额度用完/鉴权失败）要给出可操作的下一步，
+         * 而不是让用户对着一份"全英文的成品"猜哪里错了。 */
+        const hint = (err && err.fatal)
+          ? '（提示：在文件行左侧的引擎下拉里改成「百度翻译」或「DeepSeek」再试一次）'
+          : '';
+        f.message = '失败：' + err.message + hint;
+        setStage(f); showToast('翻译失败：' + err.message, true);
+      }
       e.target.disabled = false;
     }
   });
@@ -6755,9 +6922,20 @@ ${opts.autoPrint ? '<script>window.addEventListener("load",function(){setTimeout
     });
     refreshTMStats();
     f.progress = 90;
+    const ENGINE_CN = { tencent: '腾讯云', baidu: '百度翻译', deepseek: 'DeepSeek' };
+    const usedEngine = ENGINE_CN[result.engine] || result.engine || '';
+    const switchedTip = result.engineSwitched
+      ? ` · 原引擎不可用，已自动改用${usedEngine}`
+      : (result.serverFellBack
+        ? ` · 云函数已自动改用${ENGINE_CN[result.serverEngine] || result.serverEngine}`
+        : '');
     f.message = `翻译完成（成功 ${result.translated} 段 · 记忆复用 ${result.fromCache} 段 · 保留原文 ${result.fallback} 段` +
-      ` · 保护 ${result.symbols} 个符号 / 套用 ${result.termsApplied} 处术语），正在生成文件…`;
+      ` · 保护 ${result.symbols} 个符号 / 套用 ${result.termsApplied} 处术语）${switchedTip}，正在生成文件…`;
     setStage(f);
+    if (result.engineSwitched) {
+      const why = (result.engineFailures || []).map(x => (ENGINE_CN[x.engine] || x.engine) + '：' + x.message).join('；');
+      showToast(`「${ENGINE_CN[result.engineFailures[0].engine] || result.engineFailures[0].engine}」不可用，已自动改用「${usedEngine}」完成翻译。( ${why} )`, true);
+    }
     if (result.missingSymbols && result.missingSymbols.length) {
       showToast(`提示：有 ${result.missingSymbols.length} 个符号占位符被翻译引擎改动，已尽量还原`, true);
     }

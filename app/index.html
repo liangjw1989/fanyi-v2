@@ -386,7 +386,7 @@
    * 腾讯云 SecretId/SecretKey、DeepSeek API Key 一律放在云函数的环境变量里。
    * 地址来源优先级：界面里填写（localStorage） > config.js > 空
    */
-  const VERSION = '2.8.1';
+  const VERSION = '2.8.2';
   const DEPLOY_CONFIG = window.LINGYI_CONFIG || {};
   const OUT_FMT = {
     'pdf-inplace': 'PDF 原位替换（原版式·译文可选中可搜索）',
@@ -653,7 +653,17 @@
     }
     if (e.target.classList.contains('process-btn')) {
       e.target.disabled = true;
-      try { await processFile(f); } catch (err) { console.error(err); f.status = 'error'; f.message = '失败：' + err.message; setStage(f); showToast('翻译失败：' + err.message, true); }
+      try { await processFile(f); } catch (err) {
+        console.error(err);
+        f.status = 'error';
+        /* 致命错误（额度用完/鉴权失败）要给出可操作的下一步，
+         * 而不是让用户对着一份"全英文的成品"猜哪里错了。 */
+        const hint = (err && err.fatal)
+          ? '（提示：在文件行左侧的引擎下拉里改成「百度翻译」或「DeepSeek」再试一次）'
+          : '';
+        f.message = '失败：' + err.message + hint;
+        setStage(f); showToast('翻译失败：' + err.message, true);
+      }
       e.target.disabled = false;
     }
   });
@@ -1325,9 +1335,20 @@
     });
     refreshTMStats();
     f.progress = 90;
+    const ENGINE_CN = { tencent: '腾讯云', baidu: '百度翻译', deepseek: 'DeepSeek' };
+    const usedEngine = ENGINE_CN[result.engine] || result.engine || '';
+    const switchedTip = result.engineSwitched
+      ? ` · 原引擎不可用，已自动改用${usedEngine}`
+      : (result.serverFellBack
+        ? ` · 云函数已自动改用${ENGINE_CN[result.serverEngine] || result.serverEngine}`
+        : '');
     f.message = `翻译完成（成功 ${result.translated} 段 · 记忆复用 ${result.fromCache} 段 · 保留原文 ${result.fallback} 段` +
-      ` · 保护 ${result.symbols} 个符号 / 套用 ${result.termsApplied} 处术语），正在生成文件…`;
+      ` · 保护 ${result.symbols} 个符号 / 套用 ${result.termsApplied} 处术语）${switchedTip}，正在生成文件…`;
     setStage(f);
+    if (result.engineSwitched) {
+      const why = (result.engineFailures || []).map(x => (ENGINE_CN[x.engine] || x.engine) + '：' + x.message).join('；');
+      showToast(`「${ENGINE_CN[result.engineFailures[0].engine] || result.engineFailures[0].engine}」不可用，已自动改用「${usedEngine}」完成翻译。( ${why} )`, true);
+    }
     if (result.missingSymbols && result.missingSymbols.length) {
       showToast(`提示：有 ${result.missingSymbols.length} 个符号占位符被翻译引擎改动，已尽量还原`, true);
     }
